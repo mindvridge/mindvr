@@ -77,11 +77,18 @@ const Index = () => {
 
         <Tabs defaultValue="logs" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="logs">로그 관리</TabsTrigger>
             <TabsTrigger value="analytics">분석 대시보드</TabsTrigger>
+            <TabsTrigger value="logs">로그 관리</TabsTrigger>
             <TabsTrigger value="add">새 로그 추가</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="analytics" className="space-y-6">
+            <VRDashboardCharts
+              getContentStats={getContentUsageStats}
+              getDeviceStats={getDeviceUsageStats}
+            />
+          </TabsContent>
+          
           <TabsContent value="logs" className="space-y-6">
             <VRDeviceSearch
               onSearch={handleSearch}
@@ -98,12 +105,7 @@ const Index = () => {
             />
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-6">
-            <VRDashboardCharts
-              getContentStats={getContentUsageStats}
-              getDeviceStats={getDeviceUsageStats}
-            />
-          </TabsContent>
+        
 
           <TabsContent value="add" className="space-y-6">
             <VRLogForm onSubmit={addLog} loading={loading} />
