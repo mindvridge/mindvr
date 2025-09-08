@@ -169,6 +169,65 @@ export const useVRLogs = () => {
     fetchLogs();
   }, []);
 
+  const deleteLog = async (logId: string) => {
+    try {
+      const { error } = await supabase
+        .from('vr_usage_logs')
+        .delete()
+        .eq('id', logId);
+
+      if (error) throw error;
+
+      toast({
+        title: '성공',
+        description: '로그가 삭제되었습니다.',
+      });
+
+      fetchLogs(searchQuery);
+    } catch (error) {
+      console.error('로그 삭제 실패:', error);
+      toast({
+        title: '오류',
+        description: '로그 삭제에 실패했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const exportToExcel = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      
+      const exportData = logs.map(log => ({
+        '기기 ID': log.device_id,
+        '콘텐츠명': log.content_name,
+        '시작시간': new Date(log.start_time).toLocaleString('ko-KR'),
+        '종료시간': log.end_time ? new Date(log.end_time).toLocaleString('ko-KR') : '진행중',
+        '사용시간(분)': log.duration_minutes || '-',
+        '생성일': new Date(log.created_at).toLocaleString('ko-KR'),
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'VR사용로그');
+
+      const fileName = `VR_사용로그_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      toast({
+        title: '성공',
+        description: '엑셀 파일이 다운로드되었습니다.',
+      });
+    } catch (error) {
+      console.error('엑셀 내보내기 실패:', error);
+      toast({
+        title: '오류',
+        description: '엑셀 내보내기에 실패했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return {
     logs,
     loading,
@@ -177,6 +236,8 @@ export const useVRLogs = () => {
     fetchLogs,
     addLog,
     updateLogEndTime,
+    deleteLog,
+    exportToExcel,
     getContentUsageStats,
     getDeviceUsageStats,
   };

@@ -1,11 +1,19 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { VRLogForm } from '@/components/vr-dashboard/VRLogForm';
 import { VRLogTable } from '@/components/vr-dashboard/VRLogTable';
 import { VRDeviceSearch } from '@/components/vr-dashboard/VRDeviceSearch';
 import { VRDashboardCharts } from '@/components/vr-dashboard/VRDashboardCharts';
 import { useVRLogs } from '@/hooks/useVRLogs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
 
 const Index = () => {
+  const { isLoggedIn, logout } = useAuth();
+  const navigate = useNavigate();
   const {
     logs,
     loading,
@@ -13,9 +21,21 @@ const Index = () => {
     addLog,
     updateLogEndTime,
     fetchLogs,
+    deleteLog,
+    exportToExcel,
     getContentUsageStats,
     getDeviceUsageStats,
   } = useVRLogs();
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      navigate('/login');
+    }
+  }, [isLoggedIn, navigate]);
+
+  if (!isLoggedIn) {
+    return null;
+  }
 
   const handleSearch = (query: string) => {
     fetchLogs(query || undefined);
@@ -27,14 +47,30 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 space-y-8">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-foreground">VR 콘텐츠 사용 대시보드</h1>
-          <p className="text-xl text-muted-foreground">
-            VR 기기의 콘텐츠 사용 현황을 모니터링하고 분석합니다
-          </p>
-        </div>
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  VR 콘텐츠 사용 로깅 대시보드
+                </CardTitle>
+                <CardDescription className="text-lg">
+                  VR 기기의 콘텐츠 사용 현황을 실시간으로 모니터링하고 분석합니다
+                </CardDescription>
+              </div>
+              <Button 
+                onClick={logout}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <LogOut size={16} />
+                로그아웃
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
 
         <Tabs defaultValue="logs" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
@@ -49,10 +85,12 @@ const Index = () => {
               currentQuery={searchQuery}
               loading={loading}
             />
-            <VRLogTable
-              logs={logs}
-              loading={loading}
+            <VRLogTable 
+              logs={logs} 
+              loading={loading} 
               onEndSession={handleEndSession}
+              onDeleteLog={deleteLog}
+              onExportExcel={exportToExcel}
             />
           </TabsContent>
 

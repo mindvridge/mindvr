@@ -5,14 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { Download, Trash2 } from 'lucide-react';
 
 interface VRLogTableProps {
   logs: VRUsageLog[];
   loading: boolean;
   onEndSession: (logId: string) => void;
+  onDeleteLog: (logId: string) => void;
+  onExportExcel: () => void;
 }
 
-export const VRLogTable = ({ logs, loading, onEndSession }: VRLogTableProps) => {
+export const VRLogTable = ({ logs, loading, onEndSession, onDeleteLog, onExportExcel }: VRLogTableProps) => {
   const formatDateTime = (dateString: string) => {
     return format(new Date(dateString), 'yyyy-MM-dd HH:mm', { locale: ko });
   };
@@ -42,10 +45,22 @@ export const VRLogTable = ({ logs, loading, onEndSession }: VRLogTableProps) => 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>VR 사용 로그</CardTitle>
-        <CardDescription>
-          총 {logs.length}개의 로그 기록
-        </CardDescription>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle>VR 사용 로그</CardTitle>
+            <CardDescription>
+              총 {logs.length}개의 로그 기록
+            </CardDescription>
+          </div>
+          <Button 
+            onClick={onExportExcel}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download size={16} />
+            엑셀 다운로드
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {logs.length === 0 ? (
@@ -82,15 +97,24 @@ export const VRLogTable = ({ logs, loading, onEndSession }: VRLogTableProps) => 
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {!log.end_time && (
+                      <div className="flex gap-2">
+                        {!log.end_time && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onEndSession(log.id)}
+                          >
+                            세션 종료
+                          </Button>
+                        )}
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => onEndSession(log.id)}
+                          variant="destructive"
+                          onClick={() => onDeleteLog(log.id)}
                         >
-                          세션 종료
+                          <Trash2 size={14} />
                         </Button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,1 +1,4 @@
 project_id = "ewyqozozuluyfnemgsuw"
+
+[functions.vr-log-api]
+verify_jwt = false
