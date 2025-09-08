@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
   const { user } = useAuth();
@@ -21,29 +22,63 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
-    // 관리자 계정 확인
-    if (loginForm.username === 'admin' && loginForm.password === '151515') {
-      // 관리자로 로그인 처리
-      const adminUser = {
-        id: 'admin-001',
-        username: 'admin',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      localStorage.setItem('current_user', JSON.stringify(adminUser));
-      localStorage.setItem('current_session_id', 'admin-session');
-      
-      toast({
-        title: '성공',
-        description: '관리자로 로그인되었습니다.',
-      });
-      
-      window.location.reload();
-    } else {
+    try {
+      // 관리자 계정을 데이터베이스에서 조회
+      const { data: admin, error } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('username', loginForm.username)
+        .single();
+
+      if (error || !admin) {
+        toast({
+          title: '오류',
+          description: '관리자 계정 정보가 올바르지 않습니다.',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 비밀번호 해시 생성 및 비교
+      const passwordHash = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            'SHA-256',
+            new TextEncoder().encode(loginForm.password + admin.username + Math.floor(new Date(admin.created_at).getTime() / 1000))
+          )
+        )
+      ).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      if (passwordHash === admin.password_hash) {
+        // 관리자로 로그인 처리
+        const adminUser = {
+          id: admin.id,
+          username: admin.username,
+          created_at: admin.created_at,
+          updated_at: admin.updated_at
+        };
+        
+        localStorage.setItem('current_user', JSON.stringify(adminUser));
+        localStorage.setItem('current_session_id', 'admin-session');
+        
+        toast({
+          title: '성공',
+          description: '관리자로 로그인되었습니다.',
+        });
+        
+        window.location.reload();
+      } else {
+        toast({
+          title: '오류',
+          description: '관리자 계정 정보가 올바르지 않습니다.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
       toast({
         title: '오류',
-        description: '관리자 계정 정보가 올바르지 않습니다.',
+        description: '로그인 처리 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
     }
