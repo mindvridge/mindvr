@@ -22,7 +22,7 @@ export default function Auth() {
     setLoading(true);
     
     // 관리자 계정 확인
-    if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
+    if (loginForm.username === 'admin' && loginForm.password === '151515') {
       // 관리자로 로그인 처리
       const adminUser = {
         id: 'admin-001',
