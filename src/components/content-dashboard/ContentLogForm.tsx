@@ -46,12 +46,9 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
   };
 
   return (
-    <Card className="max-w-2xl mx-auto">
+    <Card className="w-full max-w-md">
       <CardHeader>
         <CardTitle>새 콘텐츠 사용 로그 추가</CardTitle>
-        <CardDescription>
-          콘텐츠 사용 로그를 수동으로 추가할 수 있습니다.
-        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -79,50 +76,44 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start_time">시작 시간</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="start_time"
-                  type="datetime-local"
-                  value={formData.start_time}
-                  onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-                  required
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentDateTime('start_time')}
-                  className="whitespace-nowrap"
-                >
-                  Current
-                </Button>
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="start_time">시작 시간</Label>
+            <div className="flex gap-2">
+              <Input
+                id="start_time"
+                type="datetime-local"
+                value={formData.start_time}
+                onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                required
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCurrentDateTime('start_time')}
+                className="whitespace-nowrap"
+              >
+                현재
+              </Button>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="end_time">종료 시간 (선택사항)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="end_time"
-                  type="datetime-local"
-                  value={formData.end_time}
-                  onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentDateTime('end_time')}
-                  className="whitespace-nowrap"
-                >
-                  Current
-                </Button>
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="end_time">종료 시간 (선택사항)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="end_time"
+                type="datetime-local"
+                value={formData.end_time}
+                onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCurrentDateTime('end_time')}
+                className="whitespace-nowrap"
+              >
+                현재
+              </Button>
             </div>
           </div>
 
