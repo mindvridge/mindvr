@@ -14,7 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      vr_usage_logs: {
+        Row: {
+          content_name: string
+          created_at: string
+          device_id: string
+          duration_minutes: number | null
+          end_time: string | null
+          id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          content_name: string
+          created_at?: string
+          device_id: string
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          content_name?: string
+          created_at?: string
+          device_id?: string
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
