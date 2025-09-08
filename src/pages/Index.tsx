@@ -28,6 +28,7 @@ const Index = () => {
     exportToExcel,
     getContentUsageStats,
     getUserStats,
+    getTotalLoginStats,
   } = useContentLogs();
 
   if (authLoading) {
@@ -121,6 +122,7 @@ const Index = () => {
             <ContentDashboardCharts
               getContentUsageStats={getContentUsageStats}
               getUserStats={getUserStats}
+              getTotalLoginStats={getTotalLoginStats}
             />
           </TabsContent>
 

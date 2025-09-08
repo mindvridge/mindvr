@@ -9,11 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function Auth() {
   const { user, login, register } = useAuth();
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ username: '' });
   const [registerForm, setRegisterForm] = useState({ 
-    username: '', 
-    password: '', 
-    confirmPassword: '' 
+    username: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +31,7 @@ export default function Auth() {
     setLoading(true);
     const result = await register(registerForm);
     if (result.success) {
-      setRegisterForm({ username: '', password: '', confirmPassword: '' });
+      setRegisterForm({ username: '' });
     }
     setLoading(false);
   };
@@ -67,17 +65,6 @@ export default function Auth() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">비밀번호</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="비밀번호를 입력하세요"
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                    required
-                  />
-                </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? '로그인 중...' : '로그인'}
                 </Button>
@@ -94,28 +81,6 @@ export default function Auth() {
                     placeholder="아이디를 입력하세요"
                     value={registerForm.username}
                     onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="register-password">비밀번호</Label>
-                  <Input
-                    id="register-password"
-                    type="password"
-                    placeholder="비밀번호를 입력하세요"
-                    value={registerForm.password}
-                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="register-confirm">비밀번호 확인</Label>
-                  <Input
-                    id="register-confirm"
-                    type="password"
-                    placeholder="비밀번호를 다시 입력하세요"
-                    value={registerForm.confirmPassword}
-                    onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
                     required
                   />
                 </div>

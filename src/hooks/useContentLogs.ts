@@ -158,7 +158,7 @@ export const useContentLogs = () => {
     }
   };
 
-  const getContentUsageStats = async (): Promise<ContentUsageStats[]> => {
+  const getContentUsageStats = async (sortBy: 'usage_count' | 'total_usage_minutes' = 'total_usage_minutes'): Promise<ContentUsageStats[]> => {
     try {
       const { data, error } = await supabase
         .from('content_usage_logs')
@@ -188,8 +188,13 @@ export const useContentLogs = () => {
         }
       });
 
-      return Array.from(statsMap.values())
-        .sort((a, b) => b.total_usage_minutes - a.total_usage_minutes);
+      const sortedStats = Array.from(statsMap.values());
+      
+      if (sortBy === 'usage_count') {
+        return sortedStats.sort((a, b) => b.usage_count - a.usage_count);
+      } else {
+        return sortedStats.sort((a, b) => b.total_usage_minutes - a.total_usage_minutes);
+      }
     } catch (error) {
       console.error('콘텐츠 통계 조회 실패:', error);
       return [];
@@ -237,6 +242,32 @@ export const useContentLogs = () => {
         .sort((a, b) => b.total_usage_minutes - a.total_usage_minutes);
     } catch (error) {
       console.error('사용자 통계 조회 실패:', error);
+      return [];
+    }
+  };
+
+  const getTotalLoginStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select(`
+          users!inner(username)
+        `);
+
+      if (error) throw error;
+
+      const loginCount = new Map<string, number>();
+      
+      data?.forEach((session: any) => {
+        const username = session.users.username;
+        loginCount.set(username, (loginCount.get(username) || 0) + 1);
+      });
+
+      return Array.from(loginCount.entries())
+        .map(([username, count]) => ({ username, login_count: count }))
+        .sort((a, b) => b.login_count - a.login_count);
+    } catch (error) {
+      console.error('로그인 통계 조회 실패:', error);
       return [];
     }
   };
@@ -294,5 +325,6 @@ export const useContentLogs = () => {
     exportToExcel,
     getContentUsageStats,
     getUserStats,
+    getTotalLoginStats,
   };
 };

@@ -29,9 +29,9 @@ export const useAuth = () => {
     }
   };
 
-  const hashPassword = async (password: string): Promise<string> => {
+  const generateUserHash = async (username: string): Promise<string> => {
     const encoder = new TextEncoder();
-    const data = encoder.encode(password);
+    const data = encoder.encode(username + new Date().toISOString());
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -39,17 +39,13 @@ export const useAuth = () => {
 
   const register = async (formData: RegisterFormData) => {
     try {
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error('비밀번호가 일치하지 않습니다.');
-      }
-
-      const hashedPassword = await hashPassword(formData.password);
+      const userHash = await generateUserHash(formData.username);
 
       const { data, error } = await supabase
         .from('users')
         .insert([{
           username: formData.username,
-          password_hash: hashedPassword
+          password_hash: userHash
         }])
         .select()
         .single();
@@ -79,17 +75,14 @@ export const useAuth = () => {
 
   const login = async (formData: LoginFormData) => {
     try {
-      const hashedPassword = await hashPassword(formData.password);
-
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('username', formData.username)
-        .eq('password_hash', hashedPassword)
         .single();
 
       if (userError || !userData) {
-        throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
+        throw new Error('아이디가 올바르지 않습니다.');
       }
 
       // Create user session
