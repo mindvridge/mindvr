@@ -135,24 +135,46 @@ export const useContentLogs = () => {
 
   const deleteAllLogs = async () => {
     try {
-      const { error } = await supabase
+      // Delete from all user-related tables
+      const { error: contentError } = await supabase
         .from('content_usage_logs')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
-      if (error) throw error;
+      if (contentError) throw contentError;
+
+      const { error: sessionsError } = await supabase
+        .from('user_sessions')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (sessionsError) throw sessionsError;
+
+      const { error: usersError } = await supabase
+        .from('users')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (usersError) throw usersError;
+
+      const { error: vrError } = await supabase
+        .from('vr_usage_logs')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (vrError) throw vrError;
 
       toast({
         title: '성공',
-        description: '모든 로그가 삭제되었습니다.',
+        description: '모든 데이터가 삭제되었습니다.',
       });
-
-      fetchLogs(searchQuery, selectedMonth);
+      
+      await fetchLogs(searchQuery, selectedMonth);
     } catch (error) {
-      console.error('전체 로그 삭제 실패:', error);
+      console.error('전체 데이터 삭제 실패:', error);
       toast({
         title: '오류',
-        description: '전체 로그 삭제에 실패했습니다.',
+        description: '전체 데이터 삭제에 실패했습니다.',
         variant: 'destructive',
       });
     }

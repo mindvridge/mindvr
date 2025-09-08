@@ -61,14 +61,14 @@ export const ContentLogTable = ({
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
                   <Trash2 className="w-4 h-4 mr-2" />
-                  전체 삭제
+                  전체 DB 삭제
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>전체 로그 삭제</AlertDialogTitle>
+                  <AlertDialogTitle>전체 DB 삭제</AlertDialogTitle>
                   <AlertDialogDescription>
-                    모든 콘텐츠 사용 로그를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                    모든 사용자 데이터, 세션 기록, 콘텐츠 로그, VR 로그를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
