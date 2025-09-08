@@ -12,6 +12,7 @@ interface ContentLogFormProps {
 
 export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
   const [formData, setFormData] = useState<ContentLogFormData>({
+    user_id: '',
     content_name: '',
     start_time: '',
     end_time: '',
@@ -25,6 +26,7 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
     };
     onSubmit(submitData);
     setFormData({
+      user_id: '',
       content_name: '',
       start_time: '',
       end_time: '',
@@ -54,6 +56,18 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="user_id">사용자 ID</Label>
+            <Input
+              id="user_id"
+              type="text"
+              placeholder="사용자 ID를 입력하세요"
+              value={formData.user_id}
+              onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="content_name">콘텐츠명</Label>
             <Input
               id="content_name"
@@ -75,12 +89,14 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
                   value={formData.start_time}
                   onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
                   required
+                  className="flex-1"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentDateTime('start_time')}
+                  className="whitespace-nowrap"
                 >
                   Current
                 </Button>
@@ -95,12 +111,14 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
                   type="datetime-local"
                   value={formData.end_time}
                   onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                  className="flex-1"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentDateTime('end_time')}
+                  className="whitespace-nowrap"
                 >
                   Current
                 </Button>

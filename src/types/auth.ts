@@ -33,6 +33,7 @@ export interface RegisterFormData {
 }
 
 export interface ContentLogFormData {
+  user_id: string;
   content_name: string;
   start_time: string;
   end_time?: string;
