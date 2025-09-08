@@ -44,12 +44,19 @@ export const UserSessionTable = () => {
     const login = new Date(loginTime);
     const logout = new Date(logoutTime);
     const diffMs = logout.getTime() - login.getTime();
-    const diffMins = Math.round(diffMs / (1000 * 60));
+    const diffSec = Math.floor(diffMs / 1000);
     
-    const hours = Math.floor(diffMins / 60);
-    const mins = diffMins % 60;
+    const hours = Math.floor(diffSec / 3600);
+    const mins = Math.floor((diffSec % 3600) / 60);
+    const secs = diffSec % 60;
     
-    return hours > 0 ? `${hours}시간 ${mins}분` : `${mins}분`;
+    if (hours > 0) {
+      return `${hours}시간 ${mins}분 ${secs}초`;
+    } else if (mins > 0) {
+      return `${mins}분 ${secs}초`;
+    } else {
+      return `${secs}초`;
+    }
   };
 
   if (loading) {

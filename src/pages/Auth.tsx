@@ -4,35 +4,50 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
-  const { user, login, register } = useAuth();
-  const [loginForm, setLoginForm] = useState({ username: '' });
-  const [registerForm, setRegisterForm] = useState({ 
-    username: ''
-  });
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
 
   if (user) {
     return <Navigate to="/" replace />;
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await login(loginForm);
-    setLoading(false);
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const result = await register(registerForm);
-    if (result.success) {
-      setRegisterForm({ username: '' });
+    
+    // 관리자 계정 확인
+    if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
+      // 관리자로 로그인 처리
+      const adminUser = {
+        id: 'admin-001',
+        username: 'admin',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      localStorage.setItem('current_user', JSON.stringify(adminUser));
+      localStorage.setItem('current_session_id', 'admin-session');
+      
+      toast({
+        title: '성공',
+        description: '관리자로 로그인되었습니다.',
+      });
+      
+      window.location.reload();
+    } else {
+      toast({
+        title: '오류',
+        description: '관리자 계정 정보가 올바르지 않습니다.',
+        variant: 'destructive',
+      });
     }
+    
     setLoading(false);
   };
 
@@ -40,56 +55,45 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">VR 대시보드</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">관리자 대시보드</CardTitle>
           <CardDescription className="text-center">
-            계정으로 로그인하거나 새 계정을 만드세요
+            관리자 계정으로 로그인하세요
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">로그인</TabsTrigger>
-              <TabsTrigger value="register">회원가입</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-username">아이디</Label>
-                  <Input
-                    id="login-username"
-                    type="text"
-                    placeholder="아이디를 입력하세요"
-                    value={loginForm.username}
-                    onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? '로그인 중...' : '로그인'}
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="register">
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="register-username">아이디</Label>
-                  <Input
-                    id="register-username"
-                    type="text"
-                    placeholder="아이디를 입력하세요"
-                    value={registerForm.username}
-                    onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? '가입 중...' : '회원가입'}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="admin-username">관리자 아이디</Label>
+              <Input
+                id="admin-username"
+                type="text"
+                placeholder="관리자 아이디를 입력하세요"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-password">비밀번호</Label>
+              <Input
+                id="admin-password"
+                type="password"
+                placeholder="비밀번호를 입력하세요"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? '로그인 중...' : '관리자 로그인'}
+            </Button>
+          </form>
+          
+          <div className="mt-4 p-3 bg-muted rounded-md text-sm text-muted-foreground">
+            <p className="font-medium mb-1">알림:</p>
+            <p>• 일반 사용자는 API를 통해서만 가입 및 로그인할 수 있습니다.</p>
+            <p>• 웹사이트는 관리자 전용입니다.</p>
+          </div>
         </CardContent>
       </Card>
     </div>
