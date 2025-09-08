@@ -7,9 +7,10 @@ export const useVRLogs = () => {
   const [logs, setLogs] = useState<VRUsageLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
   const { toast } = useToast();
 
-  const fetchLogs = async (deviceFilter?: string) => {
+  const fetchLogs = async (deviceFilter?: string, monthFilter?: string) => {
     setLoading(true);
     try {
       let query = supabase
@@ -17,8 +18,19 @@ export const useVRLogs = () => {
         .select('*')
         .order('start_time', { ascending: false });
 
-      if (deviceFilter) {
+      if (deviceFilter && deviceFilter.trim() !== '') {
         query = query.ilike('device_id', `%${deviceFilter}%`);
+      }
+
+      if (monthFilter) {
+        const year = monthFilter.split('-')[0];
+        const month = monthFilter.split('-')[1];
+        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+        
+        query = query
+          .gte('start_time', startDate.toISOString())
+          .lte('start_time', endDate.toISOString());
       }
 
       const { data, error } = await query;
@@ -50,7 +62,7 @@ export const useVRLogs = () => {
         description: 'VR 사용 로그가 추가되었습니다.',
       });
 
-      fetchLogs(searchQuery);
+      fetchLogs(searchQuery, selectedMonth);
     } catch (error) {
       console.error('로그 추가 실패:', error);
       toast({
@@ -75,7 +87,7 @@ export const useVRLogs = () => {
         description: '세션이 종료되었습니다.',
       });
 
-      fetchLogs(searchQuery);
+      fetchLogs(searchQuery, selectedMonth);
     } catch (error) {
       console.error('로그 업데이트 실패:', error);
       toast({
@@ -183,7 +195,7 @@ export const useVRLogs = () => {
         description: '로그가 삭제되었습니다.',
       });
 
-      fetchLogs(searchQuery);
+      fetchLogs(searchQuery, selectedMonth);
     } catch (error) {
       console.error('로그 삭제 실패:', error);
       toast({
@@ -233,6 +245,8 @@ export const useVRLogs = () => {
     loading,
     searchQuery,
     setSearchQuery,
+    selectedMonth,
+    setSelectedMonth,
     fetchLogs,
     addLog,
     updateLogEndTime,

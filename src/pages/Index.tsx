@@ -18,6 +18,8 @@ const Index = () => {
     logs,
     loading,
     searchQuery,
+    selectedMonth,
+    setSelectedMonth,
     addLog,
     updateLogEndTime,
     fetchLogs,
@@ -37,8 +39,9 @@ const Index = () => {
     return null;
   }
 
-  const handleSearch = (query: string) => {
-    fetchLogs(query || undefined);
+  const handleSearch = (query: string, month?: string) => {
+    setSelectedMonth(month || '');
+    fetchLogs(query || undefined, month || undefined);
   };
 
   const handleEndSession = (logId: string) => {
@@ -83,6 +86,7 @@ const Index = () => {
             <VRDeviceSearch
               onSearch={handleSearch}
               currentQuery={searchQuery}
+              currentMonth={selectedMonth}
               loading={loading}
             />
             <VRLogTable 
