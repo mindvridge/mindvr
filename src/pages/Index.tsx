@@ -22,6 +22,7 @@ import { ContentLogForm } from '@/components/content-dashboard/ContentLogForm';
 import { ContentDashboardCharts } from '@/components/content-dashboard/ContentDashboardCharts';
 import { ContentUserSearch } from '@/components/content-dashboard/ContentUserSearch';
 import { UserSessionTable } from '@/components/content-dashboard/UserSessionTable';
+import { UserSessionForm } from '@/components/content-dashboard/UserSessionForm';
 import { useContentLogs } from '@/hooks/useContentLogs';
 
 const Index = () => {
@@ -209,8 +210,11 @@ const Index = () => {
             />
           </TabsContent>
 
-          <TabsContent value="add-log">
-            <ContentLogForm onSubmit={handleAddLog} />
+          <TabsContent value="add-log" className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <ContentLogForm onSubmit={handleAddLog} />
+              <UserSessionForm />
+            </div>
           </TabsContent>
         </Tabs>
       </div>
