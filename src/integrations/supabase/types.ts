@@ -145,6 +145,7 @@ export type Database = {
           id: string
           start_time: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           content_name: string
@@ -155,6 +156,7 @@ export type Database = {
           id?: string
           start_time: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           content_name?: string
@@ -165,6 +167,7 @@ export type Database = {
           id?: string
           start_time?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }

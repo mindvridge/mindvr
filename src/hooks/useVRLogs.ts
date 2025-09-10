@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VRUsageLog, VRLogFormData, ContentUsageStats, DeviceUsageStats } from '@/types/vr-log';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const useVRLogs = () => {
   const [logs, setLogs] = useState<VRUsageLog[]>([]);
@@ -9,6 +10,7 @@ export const useVRLogs = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const fetchLogs = async (deviceFilter?: string, monthFilter?: string) => {
     setLoading(true);
@@ -49,11 +51,20 @@ export const useVRLogs = () => {
     }
   };
 
-  const addLog = async (logData: VRLogFormData) => {
+  const addLog = async (logData: Omit<VRLogFormData, 'user_id'>) => {
+    if (!user) {
+      toast({
+        title: '오류',
+        description: '로그인이 필요합니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('vr_usage_logs')
-        .insert([logData]);
+        .insert([{ ...logData, user_id: user.id }]);
 
       if (error) throw error;
 

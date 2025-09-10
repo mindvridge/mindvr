@@ -3,15 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { VRLogFormData } from '@/types/vr-log';
 
 interface VRLogFormProps {
-  onSubmit: (data: VRLogFormData) => void;
+  onSubmit: (data: { device_id: string; content_name: string; start_time: string; end_time?: string; }) => void;
   loading?: boolean;
 }
 
 export const VRLogForm = ({ onSubmit, loading }: VRLogFormProps) => {
-  const [formData, setFormData] = useState<VRLogFormData>({
+  const [formData, setFormData] = useState({
     device_id: '',
     content_name: '',
     start_time: '',

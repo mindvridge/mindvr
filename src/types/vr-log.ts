@@ -1,5 +1,6 @@
 export interface VRUsageLog {
   id: string;
+  user_id: string;
   device_id: string;
   content_name: string;
   start_time: string;
@@ -10,6 +11,7 @@ export interface VRUsageLog {
 }
 
 export interface VRLogFormData {
+  user_id: string;
   device_id: string;
   content_name: string;
   start_time: string;
