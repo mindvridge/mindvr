@@ -40,12 +40,12 @@ export default function Auth() {
         return;
       }
 
-      // 비밀번호 해시 생성 및 비교
+      // 비밀번호 해시 생성 및 비교 (간단한 비밀번호만 해시)
       const passwordHash = Array.from(
         new Uint8Array(
           await crypto.subtle.digest(
             'SHA-256',
-            new TextEncoder().encode(loginForm.password + admin.username + Math.floor(new Date(admin.created_at).getTime() / 1000))
+            new TextEncoder().encode(loginForm.password)
           )
         )
       ).map(b => b.toString(16).padStart(2, '0')).join('');
