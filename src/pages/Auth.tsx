@@ -28,7 +28,9 @@ export default function Auth() {
         .from('admins')
         .select('*')
         .eq('username', loginForm.username)
-        .single();
+        .maybeSingle();
+
+      console.log('Login attempt:', { username: loginForm.username, admin, error });
 
       if (error || !admin) {
         toast({
@@ -49,6 +51,13 @@ export default function Auth() {
           )
         )
       ).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      console.log('Password hash comparison:', { 
+        inputPassword: loginForm.password,
+        calculatedHash: passwordHash, 
+        storedHash: admin.password_hash,
+        match: passwordHash === admin.password_hash 
+      });
 
       if (passwordHash === admin.password_hash) {
         // 관리자로 로그인 처리
