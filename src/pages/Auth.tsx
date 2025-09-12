@@ -23,50 +23,30 @@ export default function Auth() {
     setLoading(true);
     
     try {
-      // 관리자 계정을 데이터베이스에서 조회
-      const { data: admin, error } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('username', loginForm.username)
-        .maybeSingle();
+      // 보안이 강화된 인증 함수 사용
+      const { data, error } = await supabase.rpc('authenticate_admin', {
+        input_username: loginForm.username,
+        input_password: loginForm.password
+      });
 
-      console.log('Login attempt:', { username: loginForm.username, admin, error });
+      console.log('Login attempt:', { username: loginForm.username, result: data, error });
 
-      if (error || !admin) {
+      if (error) {
+        console.error('Authentication error:', error);
         toast({
           title: '오류',
-          description: '관리자 계정 정보가 올바르지 않습니다.',
+          description: '로그인 처리 중 오류가 발생했습니다.',
           variant: 'destructive',
         });
         setLoading(false);
         return;
       }
 
-      // 비밀번호 해시 생성 및 비교 (간단한 비밀번호만 해시)
-      const passwordHash = Array.from(
-        new Uint8Array(
-          await crypto.subtle.digest(
-            'SHA-256',
-            new TextEncoder().encode(loginForm.password)
-          )
-        )
-      ).map(b => b.toString(16).padStart(2, '0')).join('');
-
-      console.log('Password hash comparison:', { 
-        inputPassword: loginForm.password,
-        calculatedHash: passwordHash, 
-        storedHash: admin.password_hash,
-        match: passwordHash === admin.password_hash 
-      });
-
-      if (passwordHash === admin.password_hash) {
+      // 인증 결과 확인
+      const authResult = data?.[0];
+      if (authResult?.success && authResult?.admin_data) {
         // 관리자로 로그인 처리
-        const adminUser = {
-          id: admin.id,
-          username: admin.username,
-          created_at: admin.created_at,
-          updated_at: admin.updated_at
-        };
+        const adminUser = authResult.admin_data;
         
         localStorage.setItem('current_user', JSON.stringify(adminUser));
         localStorage.setItem('current_session_id', 'admin-session');
@@ -85,6 +65,7 @@ export default function Auth() {
         });
       }
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: '오류',
         description: '로그인 처리 중 오류가 발생했습니다.',
