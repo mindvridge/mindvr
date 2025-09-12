@@ -4,7 +4,9 @@ import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, Cart
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Clock, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Trophy, Clock, Users, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardOverviewProps {
   getContentUsageStats: () => Promise<any[]>;
@@ -19,6 +21,10 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
   const [contentData, setContentData] = useState<any[]>([]);
   const [topContent, setTopContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+  
+  const { toast } = useToast();
 
   const formatMinutes = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -53,8 +59,12 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
     return { monthStart, monthEnd };
   };
 
-  const loadDashboardData = async () => {
-    setLoading(true);
+  const loadDashboardData = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const [contentStats, userStats] = await Promise.all([
         getContentUsageStats(),
@@ -96,12 +106,40 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
         avgTime: formatMinutes(item.avg_usage_minutes)
       }));
       setTopContent(top3Content);
+      
+      // 성공 시 마지막 업데이트 시간 설정 및 토스트
+      const now = new Date();
+      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+      setLastUpdated(koreaTime.toLocaleTimeString('ko-KR', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      }));
+      
+      if (isRefresh) {
+        toast({
+          title: "새로고침 완료",
+          description: "대시보드 데이터가 성공적으로 업데이트되었습니다.",
+        });
+      }
 
     } catch (error) {
       console.error('대시보드 데이터 로딩 실패:', error);
+      if (isRefresh) {
+        toast({
+          title: "새로고침 실패",
+          description: "데이터를 가져오는 중 오류가 발생했습니다.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    loadDashboardData(true);
   };
 
   useEffect(() => {
@@ -126,7 +164,25 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <span className="text-muted-foreground">{today}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col text-right">
+            <span className="text-muted-foreground">{today}</span>
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                마지막 업데이트: {lastUpdated}
+              </span>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="h-9 w-9"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
