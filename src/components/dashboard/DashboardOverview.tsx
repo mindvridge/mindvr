@@ -26,6 +26,33 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
     return hours > 0 ? `${hours}.${Math.round((mins / 60) * 10)}시간` : `${mins}분`;
   };
 
+  const getKoreanWeekDates = () => {
+    const now = new Date();
+    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+    const day = koreaTime.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day; // 월요일을 주의 시작으로
+    
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(koreaTime);
+      date.setDate(koreaTime.getDate() + mondayOffset + i);
+      weekDates.push(date);
+    }
+    return weekDates;
+  };
+
+  const getKoreanMonthRange = () => {
+    const now = new Date();
+    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+    const year = koreaTime.getFullYear();
+    const month = koreaTime.getMonth();
+    
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    
+    return { monthStart, monthEnd };
+  };
+
   const loadDashboardData = async () => {
     setLoading(true);
     try {
@@ -34,25 +61,24 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
         getUserStats()
       ]);
 
-      // Calculate monthly and daily usage
+      // Calculate monthly and daily usage based on Korean standards
+      const { monthStart, monthEnd } = getKoreanMonthRange();
+      const daysInMonth = monthEnd.getDate();
+      
       const totalSessions = contentStats.reduce((sum, item) => sum + item.usage_count, 0);
       const totalMinutes = contentStats.reduce((sum, item) => sum + item.total_usage_minutes, 0);
       
       setMonthlyUsage(totalSessions);
-      setDailyUsage(Math.round(totalSessions / 30)); // Rough daily estimate
+      setDailyUsage(Math.round(totalSessions / daysInMonth));
       setAverageUsageTime(totalSessions > 0 ? totalMinutes / totalSessions : 0);
 
-      // Generate weekly cumulative data (mock data for demonstration)
-      const weeklyMockData = [
-        { date: '9/6', count: 32 },
-        { date: '9/7', count: 45 },
-        { date: '9/8', count: 58 },
-        { date: '9/9', count: 67 },
-        { date: '9/10', count: 78 },
-        { date: '9/11', count: 85 },
-        { date: '9/12', count: 92 }
-      ];
-      setWeeklyData(weeklyMockData);
+      // Generate weekly data based on Korean week (Monday-Sunday)
+      const weekDates = getKoreanWeekDates();
+      const weeklyData = weekDates.map((date, index) => ({
+        date: `${date.getMonth() + 1}/${date.getDate()}`,
+        count: 0 // Real data should come from actual logs
+      }));
+      setWeeklyData(weeklyData);
 
       // Prepare content data for bar chart (top 8)
       const contentChartData = contentStats.slice(0, 8).map((item, index) => ({
