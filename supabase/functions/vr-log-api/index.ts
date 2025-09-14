@@ -200,13 +200,32 @@ async function handleVRLog(supabase: any, body: ApiRequest) {
       logData.end_time = body.end_time
     }
 
-    // 사용자명이 제공된 경우 사용자 ID 조회
+    // 사용자명이 제공된 경우 사용자 ID 조회 또는 생성
     if (body.username) {
-      const { data: userData } = await supabase
+      let { data: userData, error: userError } = await supabase
         .from('users')
         .select('id')
         .eq('username', body.username)
         .single()
+      
+      // 사용자가 없으면 새로 생성
+      if (userError && userError.code === 'PGRST116') {
+        const { data: newUser, error: createError } = await supabase
+          .from('users')
+          .insert([{ username: body.username, password_hash: 'auto_generated' }])
+          .select('id')
+          .single()
+        
+        if (createError) {
+          console.error('사용자 생성 실패:', createError)
+          return createErrorResponse('사용자 생성에 실패했습니다.', 500)
+        }
+        
+        userData = newUser
+      } else if (userError) {
+        console.error('사용자 조회 실패:', userError)
+        return createErrorResponse('사용자 조회에 실패했습니다.', 500)
+      }
       
       if (userData) {
         logData.user_id = userData.id
@@ -240,15 +259,34 @@ async function handleContentLog(supabase: any, body: ApiRequest) {
   }
 
   try {
-    // 사용자 ID 조회
-    const { data: userData, error: userError } = await supabase
+    // 사용자 ID 조회 또는 생성
+    let { data: userData, error: userError } = await supabase
       .from('users')
       .select('id')
       .eq('username', body.username)
       .single()
 
-    if (userError || !userData) {
-      return createErrorResponse('사용자를 찾을 수 없습니다.', 404)
+    // 사용자가 없으면 새로 생성
+    if (userError && userError.code === 'PGRST116') {
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert([{ username: body.username, password_hash: 'auto_generated' }])
+        .select('id')
+        .single()
+      
+      if (createError) {
+        console.error('사용자 생성 실패:', createError)
+        return createErrorResponse('사용자 생성에 실패했습니다.', 500)
+      }
+      
+      userData = newUser
+    } else if (userError) {
+      console.error('사용자 조회 실패:', userError)
+      return createErrorResponse('사용자 조회에 실패했습니다.', 500)
+    }
+
+    if (!userData) {
+      return createErrorResponse('사용자 처리에 실패했습니다.', 500)
     }
 
     const logData: any = {
@@ -257,14 +295,9 @@ async function handleContentLog(supabase: any, body: ApiRequest) {
       start_time: body.start_time
     }
 
-    // 종료 시간과 지속 시간 계산
+    // 종료 시간 설정 (duration_minutes는 generated column이므로 자동 계산됨)
     if (body.end_time) {
       logData.end_time = body.end_time
-      
-      const startTime = new Date(body.start_time)
-      const endTime = new Date(body.end_time)
-      const durationMs = endTime.getTime() - startTime.getTime()
-      logData.duration_minutes = Math.max(0, Math.round(durationMs / 60000))
     }
 
     const { data, error } = await supabase
