@@ -25,6 +25,7 @@ import { UserSessionTable } from '@/components/content-dashboard/UserSessionTabl
 import { UserSessionForm } from '@/components/content-dashboard/UserSessionForm';
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { useContentLogs } from '@/hooks/useContentLogs';
+import { ApiTestPanel } from '@/components/api-test/ApiTestPanel';
 
 const Index = () => {
   const { user, loading: authLoading, logout } = useAuth();
@@ -105,12 +106,13 @@ const Index = () => {
         </div>
 
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="dashboard">대시보드</TabsTrigger>
             <TabsTrigger value="logs">콘텐츠 로그</TabsTrigger>
             <TabsTrigger value="sessions">사용자 세션</TabsTrigger>
             <TabsTrigger value="analytics">분석 대시보드</TabsTrigger>
             <TabsTrigger value="add-log">새 로그 추가</TabsTrigger>
+            <TabsTrigger value="api-test">API 테스트</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
@@ -156,6 +158,10 @@ const Index = () => {
               <ContentLogForm onSubmit={handleAddLog} />
               <UserSessionForm />
             </div>
+          </TabsContent>
+
+          <TabsContent value="api-test">
+            <ApiTestPanel />
           </TabsContent>
         </Tabs>
       </div>
