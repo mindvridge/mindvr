@@ -195,14 +195,9 @@ async function handleVRLog(supabase: any, body: ApiRequest) {
       start_time: body.start_time
     }
 
-    // 종료 시간과 지속 시간 계산
+    // 종료 시간 설정 (duration_minutes는 generated column이므로 자동 계산됨)
     if (body.end_time) {
       logData.end_time = body.end_time
-      
-      const startTime = new Date(body.start_time)
-      const endTime = new Date(body.end_time)
-      const durationMs = endTime.getTime() - startTime.getTime()
-      logData.duration_minutes = Math.max(0, Math.round(durationMs / 60000))
     }
 
     // 사용자명이 제공된 경우 사용자 ID 조회
