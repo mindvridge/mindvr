@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Trophy, Clock, Users, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DashboardOverviewProps {
   getContentUsageStats: () => Promise<any[]>;
@@ -82,11 +83,25 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
       setDailyUsage(Math.round(totalSessions / daysInMonth));
       setAverageUsageTime(totalSessions > 0 ? totalMinutes / totalSessions : 0);
 
-      // Generate weekly data based on Korean week (Monday-Sunday)
+      // Generate weekly data based on Korean week (Monday-Sunday) with real data
       const weekDates = getKoreanWeekDates();
-      const weeklyData = weekDates.map((date, index) => ({
-        date: `${date.getMonth() + 1}/${date.getDate()}`,
-        count: 0 // Real data should come from actual logs
+      const weeklyData = await Promise.all(weekDates.map(async (date) => {
+        // Get logs for this specific date
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const { data: dayLogs } = await supabase
+          .from('content_usage_logs')
+          .select('id')
+          .gte('start_time', startOfDay.toISOString())
+          .lte('start_time', endOfDay.toISOString());
+
+        return {
+          date: `${date.getMonth() + 1}/${date.getDate()}`,
+          count: dayLogs?.length || 0
+        };
       }));
       setWeeklyData(weeklyData);
 
