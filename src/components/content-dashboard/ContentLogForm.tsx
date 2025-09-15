@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ContentLogFormData } from '@/types/auth';
+import { getCurrentKoreanTimeISO } from '@/lib/dateUtils';
 
 interface ContentLogFormProps {
   onSubmit: (data: ContentLogFormData) => void;
@@ -34,14 +35,11 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
   };
 
   const setCurrentDateTime = (field: 'start_time' | 'end_time') => {
-    const now = new Date();
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
+    const now = getCurrentKoreanTimeISO();
     
     setFormData(prev => ({
       ...prev,
-      [field]: localDateTime
+      [field]: now
     }));
   };
 

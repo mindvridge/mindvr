@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserSession } from '@/types/auth';
+import { formatToKoreanTime, calculateDuration } from '@/lib/dateUtils';
 
 export const UserSessionTable = () => {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -35,27 +36,25 @@ export const UserSessionTable = () => {
   };
 
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('ko-KR');
+    return formatToKoreanTime(dateString, 'yyyy-MM-dd HH:mm:ss');
   };
 
-  const calculateDuration = (loginTime: string, logoutTime: string | null) => {
+  const formatDuration = (loginTime: string, logoutTime: string | null) => {
     if (!logoutTime) return '진행중';
     
-    const login = new Date(loginTime);
-    const logout = new Date(logoutTime);
-    const diffMs = logout.getTime() - login.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
+    const durationMinutes = calculateDuration(loginTime, logoutTime);
+    if (durationMinutes === null) return '진행중';
     
-    const hours = Math.floor(diffSec / 3600);
-    const mins = Math.floor((diffSec % 3600) / 60);
-    const secs = diffSec % 60;
+    const hours = Math.floor(durationMinutes / 60);
+    const minutes = durationMinutes % 60;
+    const seconds = Math.floor((durationMinutes % 1) * 60);
     
     if (hours > 0) {
-      return `${hours}시간 ${mins}분 ${secs}초`;
-    } else if (mins > 0) {
-      return `${mins}분 ${secs}초`;
+      return `${hours}시간 ${minutes}분`;
+    } else if (minutes > 0) {
+      return `${minutes}분`;
     } else {
-      return `${secs}초`;
+      return `${seconds}초`;
     }
   };
 
@@ -103,7 +102,7 @@ export const UserSessionTable = () => {
                       {session.logout_time ? formatDateTime(session.logout_time) : '-'}
                     </TableCell>
                     <TableCell>
-                      {calculateDuration(session.login_time, session.logout_time)}
+                      {formatDuration(session.login_time, session.logout_time)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={session.logout_time ? 'secondary' : 'default'}>

@@ -3,8 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
+import { formatToKoreanTime, calculateDuration } from '@/lib/dateUtils';
 import { Download, Trash2 } from 'lucide-react';
 
 interface VRLogTableProps {
@@ -17,10 +16,10 @@ interface VRLogTableProps {
 
 export const VRLogTable = ({ logs, loading, onEndSession, onDeleteLog, onExportExcel }: VRLogTableProps) => {
   const formatDateTime = (dateString: string) => {
-    return format(new Date(dateString), 'yyyy-MM-dd HH:mm', { locale: ko });
+    return formatToKoreanTime(dateString, 'yyyy-MM-dd HH:mm:ss');
   };
 
-  const formatDuration = (minutes: number | null) => {
+  const formatDurationFromMinutes = (minutes: number | null) => {
     if (!minutes) return '-';
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = Math.round(minutes % 60);
@@ -90,7 +89,7 @@ export const VRLogTable = ({ logs, loading, onEndSession, onDeleteLog, onExportE
                     <TableCell>
                       {log.end_time ? formatDateTime(log.end_time) : '-'}
                     </TableCell>
-                    <TableCell>{formatDuration(log.duration_minutes)}</TableCell>
+                    <TableCell>{formatDurationFromMinutes(log.duration_minutes)}</TableCell>
                     <TableCell>
                       <Badge variant={log.end_time ? 'secondary' : 'default'}>
                         {log.end_time ? '완료' : '진행중'}

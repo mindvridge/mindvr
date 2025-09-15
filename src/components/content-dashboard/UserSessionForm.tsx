@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getCurrentKoreanTimeISO } from '@/lib/dateUtils';
 
 interface UserSessionFormProps {
   loading?: boolean;
@@ -20,11 +21,8 @@ export const UserSessionForm = ({ loading }: UserSessionFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const setCurrentDateTime = (field: 'login_time' | 'logout_time') => {
-    const now = new Date();
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    setFormData(prev => ({ ...prev, [field]: localDateTime }));
+    const now = getCurrentKoreanTimeISO();
+    setFormData(prev => ({ ...prev, [field]: now }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

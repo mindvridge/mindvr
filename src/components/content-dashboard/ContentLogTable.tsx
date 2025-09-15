@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Download, Trash2, StopCircle } from 'lucide-react';
 import { ContentUsageLog } from '@/types/auth';
+import { formatToKoreanTime, calculateDuration } from '@/lib/dateUtils';
 
 interface ContentLogTableProps {
   logs: ContentUsageLog[];
@@ -22,10 +23,10 @@ export const ContentLogTable = ({
   onExportExcel 
 }: ContentLogTableProps) => {
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('ko-KR');
+    return formatToKoreanTime(dateString, 'yyyy-MM-dd HH:mm:ss');
   };
 
-  const formatDuration = (minutes: number | null) => {
+  const formatDurationFromMinutes = (minutes: number | null) => {
     if (!minutes) return '-';
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
@@ -86,7 +87,7 @@ export const ContentLogTable = ({
                     <TableCell>
                       {log.end_time ? formatDateTime(log.end_time) : '-'}
                     </TableCell>
-                    <TableCell>{formatDuration(log.duration_minutes)}</TableCell>
+                    <TableCell>{formatDurationFromMinutes(log.duration_minutes)}</TableCell>
                     <TableCell>
                       <Badge variant={log.end_time ? 'secondary' : 'default'}>
                         {log.end_time ? '완료' : '진행중'}

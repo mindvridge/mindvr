@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getCurrentKoreanTimeISO } from '@/lib/dateUtils';
 
 interface VRLogFormProps {
   onSubmit: (data: { device_id: string; content_name: string; start_time: string; end_time?: string; }) => void;
@@ -33,11 +34,8 @@ export const VRLogForm = ({ onSubmit, loading }: VRLogFormProps) => {
   };
 
   const setCurrentDateTime = (field: 'start_time' | 'end_time') => {
-    const now = new Date();
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    setFormData(prev => ({ ...prev, [field]: localDateTime }));
+    const now = getCurrentKoreanTimeISO();
+    setFormData(prev => ({ ...prev, [field]: now }));
   };
 
   return (
