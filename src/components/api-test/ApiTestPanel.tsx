@@ -89,19 +89,19 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     name: "콘텐츠 로그 기록", 
     method: "POST",
     action: "content_log",
-    description: "콘텐츠 사용 로그를 기록합니다",
+    description: "콘텐츠 사용 로그를 기록합니다 (vr_usage_logs 테이블에 device_id='CONTENT_DEVICE'로 저장)",
     parameters: {
-      user_id: "사용자 ID (필수)",
+      username: "사용자명 (필수)",
       content_name: "콘텐츠 이름 (필수)", 
       start_time: "시작 시간 (필수)",
       end_time: "종료 시간 (선택)"
     },
     example: {
       action: "content_log",
-      user_id: "uuid-user-id",
+      username: "testuser",
       content_name: "Educational VR Content",
-      start_time: "2024-01-15T10:00:00Z",
-      end_time: "2024-01-15T10:45:00Z"
+      start_time: "2025-09-15T10:00:00Z",
+      end_time: "2025-09-15T10:45:00Z"
     }
   }
 ];

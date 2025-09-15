@@ -271,6 +271,8 @@ async function handleVRLog(supabase: any, body: ApiRequest) {
 // 콘텐츠 로깅 핸들러
 // =====================================
 async function handleContentLog(supabase: any, body: ApiRequest) {
+  console.log('콘텐츠 로그 요청 처리 시작:', JSON.stringify(body, null, 2))
+  
   if (!body.username || !body.content_name || !body.start_time) {
     return createErrorResponse('username, content_name, start_time은 필수입니다.', 400)
   }
@@ -283,13 +285,19 @@ async function handleContentLog(supabase: any, body: ApiRequest) {
       .eq('username', body.username)
       .single()
 
+    console.log('사용자 조회 결과:', { userData, userError })
+
     // 사용자가 없으면 새로 생성
     if (userError && userError.code === 'PGRST116') {
+      console.log('새 사용자 생성 시작:', body.username)
+      
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert([{ username: body.username, password_hash: 'auto_generated' }])
         .select('id')
         .single()
+      
+      console.log('새 사용자 생성 결과:', { newUser, createError })
       
       if (createError) {
         console.error('사용자 생성 실패:', createError)
@@ -306,8 +314,10 @@ async function handleContentLog(supabase: any, body: ApiRequest) {
       return createErrorResponse('사용자 처리에 실패했습니다.', 500)
     }
 
+    // vr_usage_logs 테이블에 콘텐츠 로그 저장 (device_id를 'CONTENT_DEVICE'로 설정)
     const logData: any = {
       user_id: userData.id,
+      device_id: 'CONTENT_DEVICE',
       content_name: body.content_name,
       start_time: body.start_time
     }
@@ -317,20 +327,25 @@ async function handleContentLog(supabase: any, body: ApiRequest) {
       logData.end_time = body.end_time
     }
 
+    console.log('콘텐츠 로그 저장 시작:', JSON.stringify(logData, null, 2))
+
     const { data, error } = await supabase
-      .from('content_usage_logs')
+      .from('vr_usage_logs')
       .insert([logData])
       .select()
       .single()
+
+    console.log('콘텐츠 로그 저장 결과:', { data, error })
 
     if (error) {
       console.error('콘텐츠 로그 저장 실패:', error)
       return createErrorResponse('콘텐츠 로그 저장에 실패했습니다.', 500)
     }
 
+    console.log('콘텐츠 로그 성공적으로 저장됨:', data)
     return createSuccessResponse('콘텐츠 로그가 성공적으로 저장되었습니다.', data)
   } catch (error) {
-    console.error('콘텐츠 로그 처리 중 오류:', error)
+    console.error('콘텐츠 로그 처리 중 예외 발생:', error)
     return createErrorResponse('콘텐츠 로그 처리 중 오류가 발생했습니다.', 500)
   }
 }
@@ -392,11 +407,12 @@ async function queryVRLogs(supabase: any, params: { username?: string, device_id
 
 async function queryContentLogs(supabase: any, params: { username?: string, limit: number }) {
   let query = supabase
-    .from('content_usage_logs')
+    .from('vr_usage_logs')
     .select(`
       *,
       users!inner(username)
     `)
+    .eq('device_id', 'CONTENT_DEVICE')
     .order('start_time', { ascending: false })
     .limit(params.limit)
 
