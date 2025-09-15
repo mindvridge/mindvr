@@ -38,6 +38,39 @@ export type Database = {
         }
         Relationships: []
       }
+      content_data: {
+        Row: {
+          content_filename: string | null
+          content_name: string
+          created_at: string
+          description: string | null
+          file_size: number | null
+          file_type: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          content_filename?: string | null
+          content_name: string
+          created_at?: string
+          description?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          content_filename?: string | null
+          content_name?: string
+          created_at?: string
+          description?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_usage_logs: {
         Row: {
           content_name: string

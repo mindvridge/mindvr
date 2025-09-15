@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { LogOut, Trash2 } from 'lucide-react';
+import { LogOut, Trash2, Database } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -95,14 +96,22 @@ const Index = () => {
               사용자: {user.username} | 콘텐츠 사용 로그 및 분석 관리
             </p>
           </div>
-          <Button 
-            onClick={logout} 
-            variant="outline" 
-            className="flex items-center gap-2"
-          >
-            <LogOut size={16} />
-            로그아웃
-          </Button>
+          <div className="flex gap-2">
+            <Link to="/content-management">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Database size={16} />
+                콘텐츠 관리
+              </Button>
+            </Link>
+            <Button 
+              onClick={logout} 
+              variant="outline" 
+              className="flex items-center gap-2"
+            >
+              <LogOut size={16} />
+              로그아웃
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="dashboard" className="space-y-6">
