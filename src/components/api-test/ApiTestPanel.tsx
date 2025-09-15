@@ -80,8 +80,8 @@ const API_ENDPOINTS: ApiEndpoint[] = [
       action: "vr_log",
       device_id: "VR_DEVICE_001",
       content_name: "VR Racing Game",
-      start_time: "2024-01-15T10:00:00Z",
-      end_time: "2024-01-15T10:30:00Z",
+      start_time: "2025-09-15T10:00:00Z",
+      end_time: "2025-09-15T10:30:00Z",
       username: "testuser"
     }
   },
