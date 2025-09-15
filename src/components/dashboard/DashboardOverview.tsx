@@ -93,7 +93,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
         endOfDay.setHours(23, 59, 59, 999);
 
         const { data: dayLogs } = await supabase
-          .from('content_usage_logs')
+          .from('vr_usage_logs')
           .select('id')
           .gte('start_time', startOfDay.toISOString())
           .lte('start_time', endOfDay.toISOString());

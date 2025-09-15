@@ -71,47 +71,6 @@ export type Database = {
         }
         Relationships: []
       }
-      content_usage_logs: {
-        Row: {
-          content_name: string
-          created_at: string
-          duration_minutes: number | null
-          end_time: string | null
-          id: string
-          start_time: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          content_name: string
-          created_at?: string
-          duration_minutes?: number | null
-          end_time?: string | null
-          id?: string
-          start_time: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          content_name?: string
-          created_at?: string
-          duration_minutes?: number | null
-          end_time?: string | null
-          id?: string
-          start_time?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "content_usage_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_sessions: {
         Row: {
           created_at: string

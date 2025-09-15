@@ -16,7 +16,7 @@ export const useContentLogs = () => {
     setLoading(true);
     try {
       let query = supabase
-        .from('content_usage_logs')
+        .from('vr_usage_logs')
         .select(`
           *,
           users!inner(username)
@@ -59,9 +59,10 @@ export const useContentLogs = () => {
     
     try {
       const { error } = await supabase
-        .from('content_usage_logs')
+        .from('vr_usage_logs')
         .insert([{
           user_id: user.id,
+          device_id: 'CONTENT_DEVICE',
           ...logData
         }]);
 
@@ -86,7 +87,7 @@ export const useContentLogs = () => {
   const updateLogEndTime = async (logId: string, endTime: string) => {
     try {
       const { error } = await supabase
-        .from('content_usage_logs')
+        .from('vr_usage_logs')
         .update({ end_time: endTime })
         .eq('id', logId);
 
@@ -111,7 +112,7 @@ export const useContentLogs = () => {
   const deleteLog = async (logId: string) => {
     try {
       const { error } = await supabase
-        .from('content_usage_logs')
+        .from('vr_usage_logs')
         .delete()
         .eq('id', logId);
 
@@ -136,12 +137,12 @@ export const useContentLogs = () => {
   const deleteAllLogs = async () => {
     try {
       // Delete from all user-related tables
-      const { error: contentError } = await supabase
-        .from('content_usage_logs')
+      const { error: vrError } = await supabase
+        .from('vr_usage_logs')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
 
-      if (contentError) throw contentError;
+      if (vrError) throw vrError;
 
       const { error: sessionsError } = await supabase
         .from('user_sessions')
@@ -156,13 +157,6 @@ export const useContentLogs = () => {
         .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (usersError) throw usersError;
-
-      const { error: vrError } = await supabase
-        .from('vr_usage_logs')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (vrError) throw vrError;
 
       toast({
         title: '성공',
@@ -183,7 +177,7 @@ export const useContentLogs = () => {
   const getContentUsageStats = async (sortBy: 'usage_count' | 'total_usage_minutes' = 'total_usage_minutes'): Promise<ContentUsageStats[]> => {
     try {
       const { data, error } = await supabase
-        .from('content_usage_logs')
+        .from('vr_usage_logs')
         .select('content_name, duration_minutes')
         .not('duration_minutes', 'is', null);
 
@@ -226,7 +220,7 @@ export const useContentLogs = () => {
   const getUserStats = async (): Promise<UserStats[]> => {
     try {
       const { data, error } = await supabase
-        .from('content_usage_logs')
+        .from('vr_usage_logs')
         .select(`
           duration_minutes, 
           start_time,
