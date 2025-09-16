@@ -12,9 +12,10 @@ import { supabase } from '@/integrations/supabase/client';
 interface DashboardOverviewProps {
   getContentUsageStats: () => Promise<any[]>;
   getUserStats: () => Promise<any[]>;
+  getLoginSessionStats: () => Promise<any>;
 }
 
-export const DashboardOverview = ({ getContentUsageStats, getUserStats }: DashboardOverviewProps) => {
+export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLoginSessionStats }: DashboardOverviewProps) => {
   const [monthlyUsage, setMonthlyUsage] = useState(0);
   const [dailyUsage, setDailyUsage] = useState(0);
   const [averageUsageTime, setAverageUsageTime] = useState(0);
@@ -67,40 +68,47 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats }: Dashbo
       setLoading(true);
     }
     try {
-      const [contentStats, userStats] = await Promise.all([
+      const [contentStats, userStats, sessionStats] = await Promise.all([
         getContentUsageStats(),
-        getUserStats()
+        getUserStats(),
+        getLoginSessionStats()
       ]);
 
-      // Calculate monthly and daily usage based on Korean standards
+      // Calculate monthly and daily usage based on Korean standards (login-based)
       const { monthStart, monthEnd } = getKoreanMonthRange();
       const daysInMonth = monthEnd.getDate();
       
-      const totalSessions = contentStats.reduce((sum, item) => sum + item.usage_count, 0);
-      const totalMinutes = contentStats.reduce((sum, item) => sum + item.total_usage_minutes, 0);
+      // Get monthly login sessions
+      const { data: monthlyLogins } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .gte('login_time', monthStart.toISOString())
+        .lte('login_time', monthEnd.toISOString());
       
-      setMonthlyUsage(totalSessions);
-      setDailyUsage(Math.round(totalSessions / daysInMonth));
-      setAverageUsageTime(totalSessions > 0 ? totalMinutes / totalSessions : 0);
+      const monthlyLoginCount = monthlyLogins?.length || 0;
+      
+      setMonthlyUsage(monthlyLoginCount);
+      setDailyUsage(Math.round(monthlyLoginCount / daysInMonth));
+      setAverageUsageTime(sessionStats.avgSessionMinutes);
 
-      // Generate weekly data based on Korean week (Monday-Sunday) with real data
+      // Generate weekly data based on Korean week (Monday-Sunday) with login data
       const weekDates = getKoreanWeekDates();
       const weeklyData = await Promise.all(weekDates.map(async (date) => {
-        // Get logs for this specific date
+        // Get login sessions for this specific date
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
-        const { data: dayLogs } = await supabase
-          .from('vr_usage_logs')
+        const { data: dayLogins } = await supabase
+          .from('user_sessions')
           .select('id')
-          .gte('start_time', startOfDay.toISOString())
-          .lte('start_time', endOfDay.toISOString());
+          .gte('login_time', startOfDay.toISOString())
+          .lte('login_time', endOfDay.toISOString());
 
         return {
           date: `${date.getMonth() + 1}/${date.getDate()}`,
-          count: dayLogs?.length || 0
+          count: dayLogins?.length || 0
         };
       }));
       setWeeklyData(weeklyData);

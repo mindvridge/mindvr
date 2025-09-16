@@ -288,6 +288,50 @@ export const useContentLogs = () => {
     }
   };
 
+  const getLoginSessionStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select(`
+          login_time,
+          logout_time,
+          users!inner(username)
+        `);
+
+      if (error) throw error;
+
+      const sessions = data || [];
+      const totalSessions = sessions.length;
+      let totalSessionMinutes = 0;
+      let completedSessions = 0;
+
+      sessions.forEach((session: any) => {
+        if (session.logout_time) {
+          const loginTime = new Date(session.login_time);
+          const logoutTime = new Date(session.logout_time);
+          const durationMinutes = (logoutTime.getTime() - loginTime.getTime()) / (1000 * 60);
+          totalSessionMinutes += durationMinutes;
+          completedSessions++;
+        }
+      });
+
+      const avgSessionMinutes = completedSessions > 0 ? totalSessionMinutes / completedSessions : 0;
+
+      return {
+        totalSessions,
+        avgSessionMinutes,
+        completedSessions
+      };
+    } catch (error) {
+      console.error('로그인 세션 통계 조회 실패:', error);
+      return {
+        totalSessions: 0,
+        avgSessionMinutes: 0,
+        completedSessions: 0
+      };
+    }
+  };
+
   const exportToExcel = async () => {
     try {
       const XLSX = await import('xlsx');
@@ -342,5 +386,6 @@ export const useContentLogs = () => {
     getContentUsageStats,
     getUserStats,
     getTotalLoginStats,
+    getLoginSessionStats,
   };
 };

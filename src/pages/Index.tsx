@@ -47,6 +47,7 @@ const Index = () => {
     getContentUsageStats,
     getUserStats,
     getTotalLoginStats,
+    getLoginSessionStats,
   } = useContentLogs();
 
   if (authLoading) {
@@ -125,9 +126,10 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="dashboard">
-            <DashboardOverview
+            <DashboardOverview 
               getContentUsageStats={getContentUsageStats}
               getUserStats={getUserStats}
+              getLoginSessionStats={getLoginSessionStats}
             />
           </TabsContent>
 
