@@ -113,11 +113,14 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       }));
       setWeeklyData(weeklyData);
 
-      // Prepare content data for bar chart (top 8)
-      const contentChartData = contentStats.slice(0, 8).map((item, index) => ({
-        name: (index + 1).toString(),
-        count: item.usage_count
-      }));
+      // Prepare content data for bar chart (always 8 items)
+      const contentChartData = Array.from({ length: 8 }, (_, index) => {
+        const item = contentStats[index];
+        return {
+          name: (index + 1).toString(),
+          count: item ? item.usage_count : 0
+        };
+      });
       setContentData(contentChartData);
 
       // Prepare top 3 content for table
@@ -259,7 +262,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
               config={{
                 count: {
                   label: "이용 횟수",
-                  color: "hsl(var(--primary))",
+                  color: "hsl(260 80% 60%)",
                 },
               }}
               className="h-[250px]"
@@ -273,9 +276,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
                   <Line 
                     type="monotone" 
                     dataKey="count" 
-                    stroke="hsl(var(--primary))" 
+                    stroke="hsl(260 80% 60%)" 
                     strokeWidth={3}
-                    dot={{ fill: "hsl(var(--primary))", strokeWidth: 2 }}
+                    dot={{ fill: "hsl(260 80% 60%)", strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
