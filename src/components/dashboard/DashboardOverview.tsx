@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -296,7 +296,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
               config={{
                 count: {
                   label: "재생 횟수",
-                  color: "hsl(var(--primary))",
+                  color: "hsl(260 80% 60%)",
                 },
               }}
               className="h-[250px]"
@@ -307,7 +307,18 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
                   <XAxis dataKey="name" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill="hsl(260 80% 60%)" radius={[4, 4, 0, 0]}>
+                    <LabelList 
+                      dataKey="count" 
+                      position="top" 
+                      style={{ 
+                        fill: "hsl(var(--foreground))", 
+                        fontSize: "12px", 
+                        fontWeight: "500" 
+                      }}
+                      formatter={(value: number) => value > 0 ? value : ""}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
