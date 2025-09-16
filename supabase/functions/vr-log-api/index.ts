@@ -368,6 +368,8 @@ async function handleDataQuery(supabase: any, req: Request) {
         return await queryContentLogs(supabase, { username, limit })
       case 'user_sessions':
         return await queryUserSessions(supabase, { username, limit })
+      case 'content_data':
+        return await queryContentData(supabase, { limit })
       default:
         return createErrorResponse('유효하지 않은 조회 타입입니다.', 400)
     }
@@ -452,6 +454,21 @@ async function queryUserSessions(supabase: any, params: { username?: string, lim
   }
 
   return createSuccessResponse('세션을 성공적으로 조회했습니다.', data)
+}
+
+async function queryContentData(supabase: any, params: { limit: number }) {
+  const { data, error } = await supabase
+    .from('content_data')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(params.limit)
+
+  if (error) {
+    console.error('콘텐츠 데이터 조회 실패:', error)
+    return createErrorResponse('콘텐츠 데이터 조회에 실패했습니다.', 500)
+  }
+
+  return createSuccessResponse('콘텐츠 데이터를 성공적으로 조회했습니다.', data)
 }
 
 // =====================================
