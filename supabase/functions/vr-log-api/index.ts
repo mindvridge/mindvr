@@ -108,7 +108,15 @@ async function handleUserRegister(supabase: any, body: ApiRequest) {
       return createErrorResponse(message, 500)
     }
 
-    return createSuccessResponse('사용자가 성공적으로 등록되었습니다.', userData)
+    // Unity UserData 클래스에 맞게 필드 정리
+    const userResponse = {
+      id: userData.id,
+      username: userData.username,
+      created_at: userData.created_at,
+      updated_at: userData.updated_at
+    }
+    
+    return createSuccessResponse('사용자가 성공적으로 등록되었습니다.', userResponse)
   } catch (error) {
     console.error('사용자 등록 중 오류:', error)
     return createErrorResponse('사용자 등록 중 오류가 발생했습니다.', 500)
@@ -147,8 +155,16 @@ async function handleUserLogin(supabase: any, body: ApiRequest) {
       return createErrorResponse('세션 생성에 실패했습니다.', 500)
     }
 
+    // Unity UserData 클래스에 맞게 user 필드 정리
+    const userResponse = {
+      id: userData.id,
+      username: userData.username,
+      created_at: userData.created_at,
+      updated_at: userData.updated_at
+    }
+    
     return createSuccessResponse('로그인되었습니다.', {
-      user: userData,
+      user: userResponse,
       session: sessionData
     })
   } catch (error) {
