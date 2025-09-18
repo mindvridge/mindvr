@@ -18,7 +18,7 @@ interface DashboardOverviewProps {
 export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLoginSessionStats }: DashboardOverviewProps) => {
   const [monthlyUsage, setMonthlyUsage] = useState(0);
   const [dailyUsage, setDailyUsage] = useState(0);
-  const [averageUsageTime, setAverageUsageTime] = useState(0);
+  const [weeklyUsage, setWeeklyUsage] = useState(0);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [contentData, setContentData] = useState<any[]>([]);
   const [topContent, setTopContent] = useState<any[]>([]);
@@ -74,11 +74,12 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         getLoginSessionStats()
       ]);
 
-      // Calculate monthly and daily usage based on Korean standards (login-based)
-      const { monthStart, monthEnd } = getKoreanMonthRange();
-      const daysInMonth = monthEnd.getDate();
+      // Calculate Korean timezone dates
+      const now = new Date();
+      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
       
-      // Get monthly login sessions
+      // Get monthly usage count (this month)
+      const { monthStart, monthEnd } = getKoreanMonthRange();
       const { data: monthlyLogins } = await supabase
         .from('user_sessions')
         .select('id')
@@ -87,12 +88,39 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       const monthlyLoginCount = monthlyLogins?.length || 0;
       
+      // Get daily usage count (today only)
+      const todayStart = new Date(koreaTime);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(koreaTime);
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      const { data: todayLogins } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .gte('login_time', todayStart.toISOString())
+        .lte('login_time', todayEnd.toISOString());
+      
+      const dailyLoginCount = todayLogins?.length || 0;
+      
       setMonthlyUsage(monthlyLoginCount);
-      setDailyUsage(Math.round(monthlyLoginCount / daysInMonth));
-      setAverageUsageTime(sessionStats.avgSessionMinutes);
+      setDailyUsage(dailyLoginCount);
 
-      // Generate weekly data based on Korean week (Monday-Sunday) with login data
+      // Get weekly usage count (this week total)
       const weekDates = getKoreanWeekDates();
+      const weekStart = weekDates[0];
+      const weekEnd = weekDates[weekDates.length - 1];
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      const { data: weeklyLogins } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .gte('login_time', weekStart.toISOString())
+        .lte('login_time', weekEnd.toISOString());
+      
+      const weeklyLoginCount = weeklyLogins?.length || 0;
+      setWeeklyUsage(weeklyLoginCount);
+
+      // Generate weekly data for chart (daily breakdown)
       const weeklyData = await Promise.all(weekDates.map(async (date) => {
         // Get login sessions for this specific date
         const startOfDay = new Date(date);
@@ -134,8 +162,6 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setTopContent(top3Content);
       
       // 성공 시 마지막 업데이트 시간 설정 및 토스트
-      const now = new Date();
-      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
       setLastUpdated(koreaTime.toLocaleTimeString('ko-KR', { 
         hour: '2-digit', 
         minute: '2-digit', 
@@ -241,10 +267,10 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">{formatMinutes(averageUsageTime)}</p>
-                <p className="text-sm text-muted-foreground">평균 사용 시간</p>
+                <p className="text-2xl font-bold">{weeklyUsage}</p>
+                <p className="text-sm text-muted-foreground">주간 누적 이용 횟수</p>
               </div>
-              <Clock className="h-8 w-8 text-primary" />
+              <Users className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
