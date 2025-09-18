@@ -89,16 +89,24 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const monthlyLoginCount = monthlyLogins?.length || 0;
       
       // Get daily usage count (today only)
-      const todayStart = new Date(koreaTime);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(koreaTime);
-      todayEnd.setHours(23, 59, 59, 999);
+      const today = new Date(koreaTime);
+      const todayYear = today.getFullYear();
+      const todayMonth = today.getMonth();
+      const todayDate = today.getDate();
+      
+      // Create start and end of day in Korea timezone
+      const todayStart = new Date(todayYear, todayMonth, todayDate, 0, 0, 0, 0);
+      const todayEnd = new Date(todayYear, todayMonth, todayDate, 23, 59, 59, 999);
+      
+      // Convert to UTC for database query
+      const todayStartUTC = new Date(todayStart.getTime() - (9 * 60 * 60 * 1000));
+      const todayEndUTC = new Date(todayEnd.getTime() - (9 * 60 * 60 * 1000));
       
       const { data: todayLogins } = await supabase
         .from('user_sessions')
         .select('id')
-        .gte('login_time', todayStart.toISOString())
-        .lte('login_time', todayEnd.toISOString());
+        .gte('login_time', todayStartUTC.toISOString())
+        .lte('login_time', todayEndUTC.toISOString());
       
       const dailyLoginCount = todayLogins?.length || 0;
       
