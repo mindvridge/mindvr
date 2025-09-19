@@ -149,27 +149,35 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       }));
       setWeeklyData(weeklyData);
 
-      // Get content play counts from vr_usage_logs
-      const { data: contentPlayCounts } = await supabase
+      // Get content play counts from vr_usage_logs - 전체 기간
+      const { data: allContentLogs } = await supabase
         .from('vr_usage_logs')
         .select('content_name')
         .not('content_name', 'is', null);
 
-      // Count plays by content_name
-      const contentCounts = (contentPlayCounts || []).reduce((acc: any, log: any) => {
-        const contentName = log.content_name;
+      console.log('All content logs:', allContentLogs);
+
+      // Count plays by content_name for all time
+      const allContentCounts = (allContentLogs || []).reduce((acc: any, log: any) => {
+        const contentName = log.content_name.toString();
         acc[contentName] = (acc[contentName] || 0) + 1;
         return acc;
       }, {});
 
+      console.log('All content counts:', allContentCounts);
+
       // Prepare content data for bar chart (always 8 items: 1-8)
       const contentChartData = Array.from({ length: 8 }, (_, index) => {
         const contentName = (index + 1).toString();
+        const count = allContentCounts[contentName] || 0;
+        console.log(`Content ${contentName}: ${count}`);
         return {
           name: contentName,
-          count: contentCounts[contentName] || 0
+          count: count
         };
       });
+      
+      console.log('Content chart data:', contentChartData);
       setContentData(contentChartData);
 
       // Get weekly TOP3 content (Korean time zone)
@@ -178,16 +186,20 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const weekEndForTop3 = weekDatesForTop3[weekDatesForTop3.length - 1];
       weekEndForTop3.setHours(23, 59, 59, 999);
       
+      console.log('Week range for TOP3:', weekStartForTop3.toISOString(), 'to', weekEndForTop3.toISOString());
+      
       const { data: weeklyContentLogs } = await supabase
         .from('vr_usage_logs')
-        .select('content_name, duration_minutes')
+        .select('content_name, duration_minutes, start_time')
         .not('content_name', 'is', null)
         .gte('start_time', weekStartForTop3.toISOString())
         .lte('start_time', weekEndForTop3.toISOString());
 
+      console.log('Weekly content logs:', weeklyContentLogs);
+
       // Count weekly plays and calculate averages
       const weeklyContentStats = (weeklyContentLogs || []).reduce((acc: any, log: any) => {
-        const contentName = log.content_name;
+        const contentName = log.content_name.toString();
         if (!acc[contentName]) {
           acc[contentName] = { playCount: 0, totalDuration: 0, durationsCount: 0 };
         }
@@ -199,6 +211,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         return acc;
       }, {});
 
+      console.log('Weekly content stats:', weeklyContentStats);
+
       // Convert to array and sort by play count
       const weeklyTopContent = Object.entries(weeklyContentStats)
         .map(([contentName, stats]: [string, any]) => ({
@@ -209,14 +223,18 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         .sort((a, b) => b.playCount - a.playCount)
         .slice(0, 3);
 
+      console.log('Weekly top content:', weeklyTopContent);
+
       // Prepare top 3 content for table
       const top3Content = weeklyTopContent.map((item, index) => ({
         rank: index + 1,
-        contentVersion: parseInt(item.contentName) || 1, // Use content_name as version number
+        contentVersion: parseInt(item.contentName) || 1,
         contentName: `콘텐츠 ${item.contentName}`,
         playCount: item.playCount,
         avgTime: formatMinutes(item.avgDuration)
       }));
+      
+      console.log('Top 3 content for display:', top3Content);
       setTopContent(top3Content);
       
       // 성공 시 마지막 업데이트 시간 설정 및 토스트
