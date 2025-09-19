@@ -46,21 +46,10 @@ export default function Auth() {
       const authResult = data?.[0];
       if (authResult?.success && authResult?.admin_data) {
         // 관리자로 로그인 처리
-        const adminUser = authResult.admin_data as { id: string; username: string; created_at: string; updated_at: string; };
-        
-        // Set admin session context in database for RLS policies
-        try {
-          await supabase.rpc('set_admin_session', {
-            admin_id_value: adminUser.id
-          });
-          console.log('Admin session context set successfully');
-        } catch (error) {
-          console.error('Failed to set admin session context:', error);
-        }
+        const adminUser = authResult.admin_data;
         
         localStorage.setItem('current_user', JSON.stringify(adminUser));
         localStorage.setItem('current_session_id', 'admin-session');
-        localStorage.setItem('current_admin_id', adminUser.id);
         
         toast({
           title: '성공',
