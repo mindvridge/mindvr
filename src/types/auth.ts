@@ -3,6 +3,7 @@ export interface User {
   username: string;
   created_at: string;
   updated_at: string;
+  isAdmin?: boolean;
 }
 
 export interface UserSession {
@@ -26,10 +27,12 @@ export interface ContentUsageLog {
 
 export interface LoginFormData {
   username: string;
+  password: string;
 }
 
 export interface RegisterFormData {
   username: string;
+  password: string;
 }
 
 export interface ContentLogFormData {

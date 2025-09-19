@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const { toast } = useToast();
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -23,57 +23,11 @@ export default function Auth() {
     setLoading(true);
     
     try {
-      // 보안이 강화된 인증 함수 사용
-      const { data, error } = await supabase.rpc('authenticate_admin', {
-        input_username: loginForm.username,
-        input_password: loginForm.password
-      });
-
-      console.log('Login attempt:', { username: loginForm.username, result: data, error });
-
-      if (error) {
-        console.error('Authentication error:', error);
-        toast({
-          title: '오류',
-          description: '로그인 처리 중 오류가 발생했습니다.',
-          variant: 'destructive',
-        });
-        setLoading(false);
-        return;
-      }
-
-      // 인증 결과 확인
-      const authResult = data?.[0];
-      if (authResult?.success && authResult?.admin_data) {
-        // 관리자로 로그인 처리
-        const adminUser = authResult.admin_data as { id: string; username: string; created_at: string; updated_at: string; };
-        
-        // Set admin session context in database for RLS policies
-        try {
-          await supabase.rpc('set_admin_session', {
-            admin_id_value: adminUser.id
-          });
-          console.log('Admin session context set successfully');
-        } catch (error) {
-          console.error('Failed to set admin session context:', error);
-        }
-        
-        localStorage.setItem('current_user', JSON.stringify(adminUser));
-        localStorage.setItem('current_session_id', 'admin-session');
-        localStorage.setItem('current_admin_id', adminUser.id);
-        
-        toast({
-          title: '성공',
-          description: '관리자로 로그인되었습니다.',
-        });
-        
-        window.location.reload();
-      } else {
-        toast({
-          title: '오류',
-          description: '관리자 계정 정보가 올바르지 않습니다.',
-          variant: 'destructive',
-        });
+      const result = await login(loginForm);
+      
+      if (result.success) {
+        // Login was successful, redirect will happen via Navigate component
+        console.log('Login successful');
       }
     } catch (error) {
       console.error('Login error:', error);
