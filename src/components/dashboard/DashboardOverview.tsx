@@ -118,13 +118,22 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const todayStartKST = todayStart.toISOString();
       const todayEndKST = todayEnd.toISOString();
       
-      const { data: todayLogins } = await supabase
+      console.log('Daily usage calculation:');
+      console.log('Korea Time:', koreaTime);
+      console.log('Today Start KST:', todayStartKST);
+      console.log('Today End KST:', todayEndKST);
+      
+      const { data: todayLogins, error: dailyError } = await supabase
         .from('user_sessions')
-        .select('id')
+        .select('id, login_time')
         .gte('login_time', todayStartKST)
         .lte('login_time', todayEndKST);
       
+      console.log('Today logins query result:', todayLogins);
+      console.log('Daily query error:', dailyError);
+      
       const dailyLoginCount = todayLogins?.length || 0;
+      console.log('Daily login count:', dailyLoginCount);
       
       setMonthlyUsage(monthlyLoginCount);
       setDailyUsage(dailyLoginCount);
