@@ -68,6 +68,22 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setLoading(true);
     }
     try {
+      // First, check if user is authenticated and set admin session if needed
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin || userData.id) {
+          try {
+            await supabase.rpc('set_admin_session', {
+              admin_id_value: userData.id
+            });
+            console.log('Admin session set for dashboard data loading');
+          } catch (error) {
+            console.error('Failed to set admin session:', error);
+          }
+        }
+      }
+
       const [contentStats, userStats, sessionStats] = await Promise.all([
         getContentUsageStats(),
         getUserStats(),
