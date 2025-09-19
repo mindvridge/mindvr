@@ -104,30 +104,32 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       const monthlyLoginCount = monthlyLogins?.length || 0;
       
-      // Get daily usage count (today only) - Use Korea timezone for database storage
+      // Get daily usage count (today only) - Convert Korea time to UTC for DB query
       const today = new Date(koreaTime);
       const todayYear = today.getFullYear();
       const todayMonth = today.getMonth();
       const todayDate = today.getDate();
       
-      // Create start and end of day in Korea timezone - store as Korea time
-      const todayStart = new Date(todayYear, todayMonth, todayDate, 0, 0, 0, 0);
-      const todayEnd = new Date(todayYear, todayMonth, todayDate, 23, 59, 59, 999);
+      // Create start and end of day in Korea timezone
+      const todayStartKST = new Date(todayYear, todayMonth, todayDate, 0, 0, 0, 0);
+      const todayEndKST = new Date(todayYear, todayMonth, todayDate, 23, 59, 59, 999);
       
-      // Use Korea timezone directly for database queries (store data in Korea time)
-      const todayStartKST = todayStart.toISOString();
-      const todayEndKST = todayEnd.toISOString();
+      // Convert to UTC for database query (subtract 9 hours)
+      const todayStartUTC = new Date(todayStartKST.getTime() - (9 * 60 * 60 * 1000));
+      const todayEndUTC = new Date(todayEndKST.getTime() - (9 * 60 * 60 * 1000));
       
       console.log('Daily usage calculation:');
       console.log('Korea Time:', koreaTime);
-      console.log('Today Start KST:', todayStartKST);
-      console.log('Today End KST:', todayEndKST);
+      console.log('Today Start KST:', todayStartKST.toISOString());
+      console.log('Today End KST:', todayEndKST.toISOString());
+      console.log('Today Start UTC:', todayStartUTC.toISOString());
+      console.log('Today End UTC:', todayEndUTC.toISOString());
       
       const { data: todayLogins, error: dailyError } = await supabase
         .from('user_sessions')
         .select('id, login_time')
-        .gte('login_time', todayStartKST)
-        .lte('login_time', todayEndKST);
+        .gte('login_time', todayStartUTC.toISOString())
+        .lte('login_time', todayEndUTC.toISOString());
       
       console.log('Today logins query result:', todayLogins);
       console.log('Daily query error:', dailyError);
