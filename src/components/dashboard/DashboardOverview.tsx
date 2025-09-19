@@ -149,23 +149,73 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       }));
       setWeeklyData(weeklyData);
 
-      // Prepare content data for bar chart (always 8 items)
+      // Get content play counts from vr_usage_logs
+      const { data: contentPlayCounts } = await supabase
+        .from('vr_usage_logs')
+        .select('content_name')
+        .not('content_name', 'is', null);
+
+      // Count plays by content_name
+      const contentCounts = (contentPlayCounts || []).reduce((acc: any, log: any) => {
+        const contentName = log.content_name;
+        acc[contentName] = (acc[contentName] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Prepare content data for bar chart (always 8 items: 1-8)
       const contentChartData = Array.from({ length: 8 }, (_, index) => {
-        const item = contentStats[index];
+        const contentName = (index + 1).toString();
         return {
-          name: (index + 1).toString(),
-          count: item ? item.usage_count : 0
+          name: contentName,
+          count: contentCounts[contentName] || 0
         };
       });
       setContentData(contentChartData);
 
+      // Get weekly TOP3 content (Korean time zone)
+      const weekDatesForTop3 = getKoreanWeekDates();
+      const weekStartForTop3 = weekDatesForTop3[0];
+      const weekEndForTop3 = weekDatesForTop3[weekDatesForTop3.length - 1];
+      weekEndForTop3.setHours(23, 59, 59, 999);
+      
+      const { data: weeklyContentLogs } = await supabase
+        .from('vr_usage_logs')
+        .select('content_name, duration_minutes')
+        .not('content_name', 'is', null)
+        .gte('start_time', weekStartForTop3.toISOString())
+        .lte('start_time', weekEndForTop3.toISOString());
+
+      // Count weekly plays and calculate averages
+      const weeklyContentStats = (weeklyContentLogs || []).reduce((acc: any, log: any) => {
+        const contentName = log.content_name;
+        if (!acc[contentName]) {
+          acc[contentName] = { playCount: 0, totalDuration: 0, durationsCount: 0 };
+        }
+        acc[contentName].playCount += 1;
+        if (log.duration_minutes) {
+          acc[contentName].totalDuration += log.duration_minutes;
+          acc[contentName].durationsCount += 1;
+        }
+        return acc;
+      }, {});
+
+      // Convert to array and sort by play count
+      const weeklyTopContent = Object.entries(weeklyContentStats)
+        .map(([contentName, stats]: [string, any]) => ({
+          contentName,
+          playCount: stats.playCount,
+          avgDuration: stats.durationsCount > 0 ? stats.totalDuration / stats.durationsCount : 0
+        }))
+        .sort((a, b) => b.playCount - a.playCount)
+        .slice(0, 3);
+
       // Prepare top 3 content for table
-      const top3Content = contentStats.slice(0, 3).map((item, index) => ({
+      const top3Content = weeklyTopContent.map((item, index) => ({
         rank: index + 1,
-        contentVersion: Math.floor(Math.random() * 10) + 1, // Mock version
-        contentName: item.content_name,
-        playCount: item.usage_count,
-        avgTime: formatMinutes(item.avg_usage_minutes)
+        contentVersion: parseInt(item.contentName) || 1, // Use content_name as version number
+        contentName: `콘텐츠 ${item.contentName}`,
+        playCount: item.playCount,
+        avgTime: formatMinutes(item.avgDuration)
       }));
       setTopContent(top3Content);
       
