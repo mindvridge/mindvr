@@ -183,17 +183,6 @@ export type Database = {
           success: boolean
         }[]
       }
-      get_user_sessions_with_usernames: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          created_at: string
-          login_time: string
-          logout_time: string
-          session_id: string
-          user_id: string
-          username: string
-        }[]
-      }
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean

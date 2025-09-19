@@ -2,12 +2,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download } from 'lucide-react';
-import { VRUsageLog } from '@/types/vr-log';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Download, Trash2, StopCircle } from 'lucide-react';
+import { ContentUsageLog } from '@/types/auth';
 import { formatToKoreanTime, calculateDuration } from '@/lib/dateUtils';
 
 interface ContentLogTableProps {
-  logs: VRUsageLog[];
+  logs: ContentUsageLog[];
   loading: boolean;
   onEndSession: (logId: string) => void;
   onDeleteLog: (logId: string) => void;
@@ -66,27 +67,55 @@ export const ContentLogTable = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>사용자 ID</TableHead>
+                  <TableHead>사용자</TableHead>
                   <TableHead>콘텐츠명</TableHead>
                   <TableHead>시작시간</TableHead>
                   <TableHead>종료시간</TableHead>
                   <TableHead>사용시간</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead>작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="font-medium">
-                      {log.device_id}
+                      {(log as any).users?.username || 'Unknown User'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{log.content_name}</Badge>
+                      <Badge variant="outline">콘텐츠 {log.content_name}</Badge>
                     </TableCell>
                     <TableCell>{formatDateTime(log.start_time)}</TableCell>
                     <TableCell>
                       {log.end_time ? formatDateTime(log.end_time) : '-'}
                     </TableCell>
                     <TableCell>{formatDurationFromMinutes(log.duration_minutes)}</TableCell>
+                    <TableCell>
+                      <Badge variant={log.end_time ? 'secondary' : 'default'}>
+                        {log.end_time ? '완료' : '진행중'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        {!log.end_time && (
+                          <Button
+                            onClick={() => onEndSession(log.id)}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <StopCircle className="w-4 h-4 mr-1" />
+                            세션 종료
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => onDeleteLog(log.id)}
+                          size="sm"
+                          variant="destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
