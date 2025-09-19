@@ -9,9 +9,125 @@ export const useAuth = () => {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Auto logout after 30 minutes of inactivity
+  const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  let inactivityTimer: NodeJS.Timeout | null = null;
+  let lastActivityTime = Date.now();
+
   useEffect(() => {
     checkAuth();
+    setupAutoLogout();
+    
+    return () => {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+    };
   }, []);
+
+  const setupAutoLogout = () => {
+    // Track user activity
+    const resetInactivityTimer = () => {
+      lastActivityTime = Date.now();
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      
+      inactivityTimer = setTimeout(() => {
+        if (currentSessionId && user) {
+          autoLogout('inactivity');
+        }
+      }, INACTIVITY_TIMEOUT);
+    };
+
+    // Listen for user activity
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(event => {
+      document.addEventListener(event, resetInactivityTimer);
+    });
+
+    // Handle page unload
+    const handleBeforeUnload = () => {
+      if (currentSessionId && user) {
+        // Use synchronous request for page unload
+        try {
+          fetch(`https://ewyqozozuluyfnemgsuw.supabase.co/rest/v1/user_sessions?id=eq.${currentSessionId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3eXFvem96dWx1eWZuZW1nc3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMDMzODMsImV4cCI6MjA3Mjg3OTM4M30.8kwXyPJpc0FMrW72PwTqJxkE0gA9Na1xH_ax4_aSEBE',
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3eXFvem96dWx1eWZuZW1nc3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMDMzODMsImV4cCI6MjA3Mjg3OTM4M30.8kwXyPJpc0FMrW72PwTqJxkE0gA9Na1xH_ax4_aSEBE'
+            },
+            body: JSON.stringify({
+              logout_time: new Date().toISOString()
+            }),
+            keepalive: true
+          });
+        } catch (error) {
+          console.error('Failed to update logout time on page unload:', error);
+        }
+      }
+    };
+
+    // Handle visibility change (tab switch, minimize, etc.)
+    const handleVisibilityChange = () => {
+      if (document.hidden && currentSessionId && user) {
+        // Wait a bit to see if user comes back
+        setTimeout(() => {
+          if (document.hidden && currentSessionId && user) {
+            autoLogout('tab_hidden');
+          }
+        }, 5000); // 5 seconds delay
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Initial timer setup
+    resetInactivityTimer();
+
+    // Cleanup function
+    return () => {
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, resetInactivityTimer);
+      });
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+    };
+  };
+
+  const autoLogout = async (reason: string) => {
+    try {
+      console.log(`Auto logout triggered: ${reason}`);
+      
+      // Update session logout time
+      if (currentSessionId) {
+        await supabase
+          .from('user_sessions')
+          .update({ logout_time: new Date().toISOString() })
+          .eq('id', currentSessionId);
+      }
+
+      setUser(null);
+      setCurrentSessionId(null);
+      localStorage.removeItem('current_user');
+      localStorage.removeItem('current_session_id');
+
+      if (reason === 'inactivity') {
+        toast({
+          title: '세션 만료',
+          description: '비활성 상태로 인해 자동 로그아웃되었습니다.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Auto logout failed:', error);
+    }
+  };
 
   const checkAuth = async () => {
     try {
@@ -132,6 +248,9 @@ export const useAuth = () => {
         localStorage.setItem('current_user', JSON.stringify(adminUser));
         localStorage.setItem('current_session_id', sessionData?.id || '');
 
+        // Setup auto logout for the session
+        setupAutoLogout();
+
         toast({
           title: '성공',
           description: '관리자로 로그인되었습니다.',
@@ -175,6 +294,9 @@ export const useAuth = () => {
       setCurrentSessionId(sessionData?.id || null);
       localStorage.setItem('current_user', JSON.stringify(regularUser));
       localStorage.setItem('current_session_id', sessionData?.id || '');
+
+      // Setup auto logout for the session
+      setupAutoLogout();
 
       toast({
         title: '성공',
