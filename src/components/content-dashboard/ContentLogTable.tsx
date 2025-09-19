@@ -80,9 +80,11 @@ export const ContentLogTable = ({
                 {logs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="font-medium">
-                      {(log as any).users?.username || 'Unknown'}
+                      {(log as any).users?.username || 'Unknown User'}
                     </TableCell>
-                    <TableCell>{log.content_name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">콘텐츠 {log.content_name}</Badge>
+                    </TableCell>
                     <TableCell>{formatDateTime(log.start_time)}</TableCell>
                     <TableCell>
                       {log.end_time ? formatDateTime(log.end_time) : '-'}

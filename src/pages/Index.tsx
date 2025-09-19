@@ -76,8 +76,7 @@ const Index = () => {
   };
 
   const handleEndSession = (logId: string) => {
-    const endTime = new Date().toISOString();
-    updateLogEndTime(logId, endTime);
+    updateLogEndTime(logId);
   };
 
   const handleAddLog = (logData: any) => {

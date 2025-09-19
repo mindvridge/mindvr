@@ -19,19 +19,25 @@ export const useContentLogs = () => {
         .from('vr_usage_logs')
         .select(`
           *,
-          users!inner(username)
+          users(username)
         `)
         .order('start_time', { ascending: false });
 
-      if (userFilter && userFilter.trim() !== '') {
-        query = query.ilike('users.username', `%${userFilter}%`);
-      }
+      // Apply user filter if provided (but since user_id might be null, we'll filter after fetching)
+      // For now, let's get all data and filter on frontend
 
       if (monthFilter) {
         const year = monthFilter.split('-')[0];
         const month = monthFilter.split('-')[1];
-        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+        
+        // Create Korean timezone dates
+        const koreaOffset = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
+        const utcStartDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const utcEndDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+        
+        // Convert to Korean timezone for database query
+        const startDate = new Date(utcStartDate.getTime() + koreaOffset);
+        const endDate = new Date(utcEndDate.getTime() + koreaOffset);
         
         query = query
           .gte('start_time', startDate.toISOString())
@@ -41,7 +47,18 @@ export const useContentLogs = () => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setLogs(data || []);
+      
+      let filteredData = data || [];
+      
+      // Apply user filter on frontend since user_id might be null
+      if (userFilter && userFilter.trim() !== '') {
+        filteredData = filteredData.filter(log => {
+          const username = (log as any).users?.username || 'Unknown';
+          return username.toLowerCase().includes(userFilter.toLowerCase());
+        });
+      }
+      
+      setLogs(filteredData);
     } catch (error) {
       console.error('로그 조회 실패:', error);
       toast({
@@ -84,11 +101,22 @@ export const useContentLogs = () => {
     }
   };
 
-  const updateLogEndTime = async (logId: string, endTime: string) => {
+  const updateLogEndTime = async (logId: string) => {
     try {
+      // Calculate duration from start_time to now
+      const log = logs.find(l => l.id === logId);
+      if (!log) return;
+      
+      const now = new Date();
+      const startTime = new Date(log.start_time);
+      const durationMinutes = Math.round((now.getTime() - startTime.getTime()) / (1000 * 60));
+      
       const { error } = await supabase
         .from('vr_usage_logs')
-        .update({ end_time: endTime })
+        .update({ 
+          end_time: now.toISOString(),
+          duration_minutes: durationMinutes
+        })
         .eq('id', logId);
 
       if (error) throw error;
@@ -336,25 +364,56 @@ export const useContentLogs = () => {
     try {
       const XLSX = await import('xlsx');
       
-      const exportData = logs.map(log => ({
+      // Fetch all logs for export (without filters)
+      const { data: allLogs, error } = await supabase
+        .from('vr_usage_logs')
+        .select(`
+          *,
+          users(username)
+        `)
+        .order('start_time', { ascending: false });
+
+      if (error) throw error;
+      
+      const exportData = (allLogs || []).map(log => ({
         '사용자': (log as any).users?.username || 'Unknown',
         '콘텐츠명': log.content_name,
-        '시작시간': new Date(log.start_time).toLocaleString('ko-KR'),
-        '종료시간': log.end_time ? new Date(log.end_time).toLocaleString('ko-KR') : '진행중',
+        '디바이스ID': log.device_id,
+        '시작시간': new Date(log.start_time).toLocaleString('ko-KR', {
+          timeZone: 'Asia/Seoul'
+        }),
+        '종료시간': log.end_time ? new Date(log.end_time).toLocaleString('ko-KR', {
+          timeZone: 'Asia/Seoul'
+        }) : '진행중',
         '사용시간(분)': log.duration_minutes || '-',
-        '생성일': new Date(log.created_at).toLocaleString('ko-KR'),
+        '생성일': new Date(log.created_at).toLocaleString('ko-KR', {
+          timeZone: 'Asia/Seoul'
+        }),
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 15 }, // 사용자
+        { wch: 15 }, // 콘텐츠명
+        { wch: 25 }, // 디바이스ID
+        { wch: 20 }, // 시작시간
+        { wch: 20 }, // 종료시간
+        { wch: 15 }, // 사용시간
+        { wch: 20 }, // 생성일
+      ];
+      worksheet['!cols'] = colWidths;
+      
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, '콘텐츠사용로그');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'VR콘텐츠사용로그');
 
-      const fileName = `콘텐츠_사용로그_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const fileName = `VR콘텐츠_사용로그_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(workbook, fileName);
 
       toast({
         title: '성공',
-        description: '엑셀 파일이 다운로드되었습니다.',
+        description: `엑셀 파일이 다운로드되었습니다. (총 ${exportData.length}개 항목)`,
       });
     } catch (error) {
       console.error('엑셀 내보내기 실패:', error);

@@ -27,7 +27,7 @@ export const ContentUserSearch = ({
       <CardHeader>
         <CardTitle>검색 및 필터</CardTitle>
         <CardDescription>
-          사용자명으로 검색하거나 월별로 필터링할 수 있습니다.
+          사용자명으로 검색하거나 월별로 필터링할 수 있습니다. (한국시간 기준)
         </CardDescription>
       </CardHeader>
       <CardContent>
