@@ -213,14 +213,16 @@ async function handleCheckUser(supabase: any, body: ApiRequest) {
       .from('users')
       .select('id, username')
       .eq('username', body.username)
-      .single()
+      .maybeSingle()
 
-    if (error && error.code === 'PGRST116') {
-      // 사용자가 존재하지 않음
-      return createSuccessResponse('계정 확인 완료', { exists: false })
-    } else if (error) {
+    if (error) {
       console.error('계정 확인 실패:', error)
       return createErrorResponse('계정 확인 중 오류가 발생했습니다.', 500)
+    }
+
+    if (!userData) {
+      // 사용자가 존재하지 않음
+      return createSuccessResponse('계정 확인 완료', { exists: false })
     }
 
     // 사용자가 존재함
