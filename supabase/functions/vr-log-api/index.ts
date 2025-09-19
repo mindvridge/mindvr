@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // 타입 정의
 // =====================================
 interface ApiRequest {
-  action: 'register' | 'login' | 'logout' | 'vr_log' | 'content_log'
+  action: 'register' | 'login' | 'logout' | 'vr_log' | 'content_log' | 'check_user' | 'auto_login'
   username?: string
   password?: string
   device_id?: string
@@ -55,6 +55,10 @@ Deno.serve(async (req) => {
           return await handleUserLogin(supabase, body)
         case 'logout':
           return await handleUserLogout(supabase, body)
+        case 'check_user':
+          return await handleCheckUser(supabase, body)
+        case 'auto_login':
+          return await handleAutoLogin(supabase, body)
         case 'vr_log':
           return await handleVRLog(supabase, body)
         case 'content_log':
@@ -193,6 +197,145 @@ async function handleUserLogout(supabase: any, body: ApiRequest) {
   } catch (error) {
     console.error('로그아웃 중 오류:', error)
     return createErrorResponse('로그아웃 중 오류가 발생했습니다.', 500)
+  }
+}
+
+// =====================================
+// 새로운 API 핸들러
+// =====================================
+async function handleCheckUser(supabase: any, body: ApiRequest) {
+  if (!body.username) {
+    return createErrorResponse('username은 필수입니다.', 400)
+  }
+
+  try {
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('id, username')
+      .eq('username', body.username)
+      .single()
+
+    if (error && error.code === 'PGRST116') {
+      // 사용자가 존재하지 않음
+      return createSuccessResponse('계정 확인 완료', { exists: false })
+    } else if (error) {
+      console.error('계정 확인 실패:', error)
+      return createErrorResponse('계정 확인 중 오류가 발생했습니다.', 500)
+    }
+
+    // 사용자가 존재함
+    return createSuccessResponse('계정 확인 완료', { 
+      exists: true,
+      user: {
+        id: userData.id,
+        username: userData.username
+      }
+    })
+  } catch (error) {
+    console.error('계정 확인 중 오류:', error)
+    return createErrorResponse('계정 확인 중 오류가 발생했습니다.', 500)
+  }
+}
+
+async function handleAutoLogin(supabase: any, body: ApiRequest) {
+  if (!body.username) {
+    return createErrorResponse('username은 필수입니다.', 400)
+  }
+
+  try {
+    // 1. 먼저 계정이 존재하는지 확인
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', body.username)
+      .single()
+
+    if (userError && userError.code === 'PGRST116') {
+      // 사용자가 존재하지 않음 - 새로 생성
+      console.log('사용자가 존재하지 않아 자동 등록:', body.username)
+      
+      const encoder = new TextEncoder()
+      const data = encoder.encode(body.username + Date.now().toString())
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+      const { data: newUserData, error: createError } = await supabase
+        .from('users')
+        .insert([{
+          username: body.username,
+          password_hash: passwordHash
+        }])
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('사용자 자동 생성 실패:', createError)
+        return createErrorResponse('사용자 생성에 실패했습니다.', 500)
+      }
+
+      userData = newUserData
+    } else if (userError) {
+      console.error('사용자 조회 실패:', userError)
+      return createErrorResponse('사용자 조회에 실패했습니다.', 500)
+    }
+
+    // 2. 기존 활성 세션이 있는지 확인
+    const { data: activeSessions, error: sessionError } = await supabase
+      .from('user_sessions')
+      .select('*')
+      .eq('user_id', userData.id)
+      .is('logout_time', null)
+      .order('login_time', { ascending: false })
+      .limit(1)
+
+    if (sessionError) {
+      console.error('활성 세션 조회 실패:', sessionError)
+      return createErrorResponse('세션 조회에 실패했습니다.', 500)
+    }
+
+    let sessionData = null
+
+    if (activeSessions && activeSessions.length > 0) {
+      // 기존 활성 세션이 있음
+      sessionData = activeSessions[0]
+      console.log('기존 활성 세션 사용:', sessionData.id)
+    } else {
+      // 새 세션 생성
+      const { data: newSession, error: newSessionError } = await supabase
+        .from('user_sessions')
+        .insert([{
+          user_id: userData.id,
+          login_time: new Date().toISOString()
+        }])
+        .select()
+        .single()
+
+      if (newSessionError) {
+        console.error('새 세션 생성 실패:', newSessionError)
+        return createErrorResponse('세션 생성에 실패했습니다.', 500)
+      }
+
+      sessionData = newSession
+      console.log('새 세션 생성:', sessionData.id)
+    }
+
+    const userResponse = {
+      id: userData.id,
+      username: userData.username,
+      created_at: userData.created_at,
+      updated_at: userData.updated_at
+    }
+    
+    return createSuccessResponse('자동 로그인 완료', {
+      user: userResponse,
+      session: sessionData,
+      is_new_user: userError && userError.code === 'PGRST116'
+    })
+    
+  } catch (error) {
+    console.error('자동 로그인 중 오류:', error)
+    return createErrorResponse('자동 로그인 중 오류가 발생했습니다.', 500)
   }
 }
 
