@@ -210,19 +210,43 @@ public class VRApiManager : MonoBehaviour
             username = username
         };
         
-        yield return StartCoroutine(SendApiRequest(request, (response) =>
+        string jsonData = JsonUtility.ToJson(request);
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
+        
+        using (UnityWebRequest webRequest = new UnityWebRequest(API_BASE_URL, "POST"))
         {
-            bool userExists = response.success && response.data != null;
+            webRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            webRequest.downloadHandler = new DownloadHandlerBuffer();
+            webRequest.SetRequestHeader("Content-Type", "application/json");
+            webRequest.timeout = timeoutSeconds;
             
-            if (userExists)
+            yield return webRequest.SendWebRequest();
+            
+            if (webRequest.result == UnityWebRequest.Result.Success)
             {
-                var userData = JsonUtility.FromJson<UserExistsData>(JsonUtility.ToJson(response.data));
-                userExists = userData.exists;
+                string responseText = webRequest.downloadHandler.text;
+                DebugLog($"check_user 원본 응답: {responseText}");
+                
+                try 
+                {
+                    var userExistsResponse = JsonUtility.FromJson<UserExistsResponse>(responseText);
+                    bool userExists = userExistsResponse.success && userExistsResponse.data != null && userExistsResponse.data.exists;
+                    
+                    DebugLog($"계정 존재 확인 결과: {username} = {userExists}");
+                    callback?.Invoke(userExists);
+                }
+                catch (System.Exception e)
+                {
+                    DebugLog($"계정 확인 파싱 오류: {e.Message}");
+                    callback?.Invoke(false);
+                }
             }
-            
-            DebugLog($"계정 존재 확인 결과: {username} = {userExists}");
-            callback?.Invoke(userExists);
-        }));
+            else
+            {
+                DebugLog($"계정 확인 요청 실패: {webRequest.error}");
+                callback?.Invoke(false);
+            }
+        }
     }
     
     /// <summary>

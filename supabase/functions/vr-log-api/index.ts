@@ -222,17 +222,21 @@ async function handleCheckUser(supabase: any, body: ApiRequest) {
 
     if (!userData) {
       // 사용자가 존재하지 않음
-      return createSuccessResponse('계정 확인 완료', { exists: false })
+      const responseData = { exists: false }
+      console.log('check_user - 사용자 없음:', JSON.stringify(responseData))
+      return createSuccessResponse('계정 확인 완료', responseData)
     }
 
     // 사용자가 존재함
-    return createSuccessResponse('계정 확인 완료', { 
+    const responseData = { 
       exists: true,
       user: {
         id: userData.id,
         username: userData.username
       }
-    })
+    }
+    console.log('check_user - 사용자 존재:', JSON.stringify(responseData))
+    return createSuccessResponse('계정 확인 완료', responseData)
   } catch (error) {
     console.error('계정 확인 중 오류:', error)
     return createErrorResponse('계정 확인 중 오류가 발생했습니다.', 500)

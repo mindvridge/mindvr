@@ -62,7 +62,16 @@ public class LoginData
 public class UserExistsData
 {
     public bool exists;
+    public UserData user; // 사용자가 존재할 때만 데이터가 있음
+}
+
+[System.Serializable]
+public class UserExistsResponse
+{
+    public bool success;
     public string message;
+    public UserExistsData data;
+    public string error;
 }
 
 #endregion
