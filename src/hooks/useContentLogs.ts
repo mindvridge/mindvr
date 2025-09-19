@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ContentUsageLog, ContentLogFormData, ContentUsageStats, UserStats } from '@/types/auth';
+import { VRUsageLog, ContentUsageStats, DeviceUsageStats } from '@/types/vr-log';
+import { UserStats } from '@/types/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const useContentLogs = () => {
-  const [logs, setLogs] = useState<ContentUsageLog[]>([]);
+  const [logs, setLogs] = useState<VRUsageLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -71,7 +72,7 @@ export const useContentLogs = () => {
     }
   };
 
-  const addLog = async (logData: ContentLogFormData) => {
+  const addLog = async (logData: any) => {
     if (!user) return;
     
     try {
