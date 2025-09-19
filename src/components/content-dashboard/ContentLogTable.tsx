@@ -2,44 +2,51 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Download, Trash2, StopCircle } from 'lucide-react';
-import { ContentUsageLog } from '@/types/auth';
+import { Download } from 'lucide-react';
+import { VRUsageLog } from '@/types/vr-log';
 import { formatToKoreanTime, calculateDuration } from '@/lib/dateUtils';
+
 interface ContentLogTableProps {
-  logs: ContentUsageLog[];
+  logs: VRUsageLog[];
   loading: boolean;
   onEndSession: (logId: string) => void;
   onDeleteLog: (logId: string) => void;
   onExportExcel: () => void;
 }
-export const ContentLogTable = ({
-  logs,
-  loading,
-  onEndSession,
-  onDeleteLog,
-  onExportExcel
+
+export const ContentLogTable = ({ 
+  logs, 
+  loading, 
+  onEndSession, 
+  onDeleteLog, 
+  onExportExcel 
 }: ContentLogTableProps) => {
   const formatDateTime = (dateString: string) => {
     return formatToKoreanTime(dateString, 'yyyy-MM-dd HH:mm:ss');
   };
+
   const formatDurationFromMinutes = (minutes: number | null) => {
     if (!minutes) return '-';
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
     return hours > 0 ? `${hours}시간 ${mins}분` : `${mins}분`;
   };
+
   if (loading) {
-    return <Card>
+    return (
+      <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             <span className="ml-2">로딩 중...</span>
           </div>
         </CardContent>
-      </Card>;
+      </Card>
+    );
   }
-  return <Card>
+
+  return (
+    <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>콘텐츠 사용 로그</CardTitle>
@@ -52,42 +59,41 @@ export const ContentLogTable = ({
         </div>
       </CardHeader>
       <CardContent>
-        {logs.length === 0 ? <p className="text-center text-muted-foreground py-8">로그가 없습니다.</p> : <div className="rounded-md border">
+        {logs.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">로그가 없습니다.</p>
+        ) : (
+          <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>사용자</TableHead>
+                  <TableHead>사용자 ID</TableHead>
                   <TableHead>콘텐츠명</TableHead>
                   <TableHead>시작시간</TableHead>
                   <TableHead>종료시간</TableHead>
                   <TableHead>사용시간</TableHead>
-                  <TableHead>상태</TableHead>
-                  
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.map(log => <TableRow key={log.id}>
+                {logs.map((log) => (
+                  <TableRow key={log.id}>
                     <TableCell className="font-medium">
-                      {(log as any).users?.username || 'Unknown User'}
+                      {log.device_id}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">콘텐츠 {log.content_name}</Badge>
+                      <Badge variant="outline">{log.content_name}</Badge>
                     </TableCell>
                     <TableCell>{formatDateTime(log.start_time)}</TableCell>
                     <TableCell>
                       {log.end_time ? formatDateTime(log.end_time) : '-'}
                     </TableCell>
                     <TableCell>{formatDurationFromMinutes(log.duration_minutes)}</TableCell>
-                    <TableCell>
-                      <Badge variant={log.end_time ? 'secondary' : 'default'}>
-                        {log.end_time ? '완료' : '진행중'}
-                      </Badge>
-                    </TableCell>
-                    
-                  </TableRow>)}
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
-          </div>}
+          </div>
+        )}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };

@@ -18,16 +18,21 @@ export const UserSessionTable = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('user_sessions')
-        .select(`
-          *,
-          users!inner(username)
-        `)
-        .order('login_time', { ascending: false })
-        .limit(100);
+        .rpc('get_user_sessions_with_usernames');
 
       if (error) throw error;
-      setSessions(data || []);
+
+      // Transform data to match expected format
+      const transformedData = data?.map((session: any) => ({
+        id: session.session_id,
+        user_id: session.user_id,
+        login_time: session.login_time,
+        logout_time: session.logout_time,
+        created_at: session.created_at,
+        users: { username: session.username }
+      })) || [];
+
+      setSessions(transformedData);
     } catch (error) {
       console.error('세션 조회 실패:', error);
     } finally {
