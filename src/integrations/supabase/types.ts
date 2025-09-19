@@ -187,6 +187,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      set_admin_session: {
+        Args: { admin_id_value: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
