@@ -190,6 +190,84 @@ public class VRApiManager : MonoBehaviour
     #region 사용자 관리
     
     /// <summary>
+    /// 계정 존재 여부 확인
+    /// </summary>
+    /// <param name="username">확인할 사용자명</param>
+    /// <param name="callback">결과 콜백 (true: 존재, false: 없음)</param>
+    public IEnumerator CheckUserExists(string username, System.Action<bool> callback)
+    {
+        if (string.IsNullOrEmpty(username))
+        {
+            callback?.Invoke(false);
+            yield break;
+        }
+        
+        DebugLog($"계정 존재 확인 시작: {username}");
+        
+        var request = new ApiRequest
+        {
+            action = "check_user",
+            username = username
+        };
+        
+        yield return StartCoroutine(SendApiRequest(request, (response) =>
+        {
+            bool userExists = response.success && response.data != null;
+            
+            if (userExists)
+            {
+                var userData = JsonUtility.FromJson<UserExistsData>(JsonUtility.ToJson(response.data));
+                userExists = userData.exists;
+            }
+            
+            DebugLog($"계정 존재 확인 결과: {username} = {userExists}");
+            callback?.Invoke(userExists);
+        }));
+    }
+    
+    /// <summary>
+    /// 자동 로그인 (계정이 없으면 자동 생성 후 로그인)
+    /// </summary>
+    /// <param name="username">로그인할 사용자명</param>
+    public IEnumerator AutoLogin(string username)
+    {
+        if (string.IsNullOrEmpty(username))
+        {
+            OnApiError?.Invoke("사용자명이 비어있습니다.");
+            yield break;
+        }
+        
+        DebugLog($"자동 로그인 시작: {username}");
+        
+        var request = new ApiRequest
+        {
+            action = "auto_login",
+            username = username
+        };
+        
+        yield return StartCoroutine(SendApiRequest(request, (response) =>
+        {
+            if (response.success && response.data != null)
+            {
+                var loginData = JsonUtility.FromJson<LoginData>(JsonUtility.ToJson(response.data));
+                currentUser = loginData.user;
+                currentSession = loginData.session;
+                isLoggedIn = true;
+                
+                SaveUserData();
+                DebugLog($"자동 로그인 성공: {currentUser.username}");
+                OnUserLoggedIn?.Invoke(currentUser, currentSession);
+            }
+            else
+            {
+                string errorMsg = $"자동 로그인 실패: {response.error}";
+                DebugLog(errorMsg);
+                OnApiError?.Invoke(errorMsg);
+            }
+        }));
+    }
+    
+    /// <summary>
     /// 사용자 등록
     /// </summary>
     /// <param name="username">등록할 사용자명</param>

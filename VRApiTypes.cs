@@ -58,6 +58,13 @@ public class LoginData
     public SessionData session;
 }
 
+[System.Serializable]
+public class UserExistsData
+{
+    public bool exists;
+    public string message;
+}
+
 #endregion
 
 #region VR 로그 관련 타입

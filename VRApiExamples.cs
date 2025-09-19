@@ -724,3 +724,326 @@ public class VRContentItemUI : MonoBehaviour
 }
 
 #endregion
+
+#region 새로운 API 사용 예시 - 계정 확인 및 자동 로그인
+
+/// <summary>
+/// 예시 4: 새로운 API 기능 사용법 (계정 확인 및 자동 로그인)
+/// Unity에서 check_user와 auto_login API를 사용하는 방법
+/// </summary>
+public class NewApiExampleController : MonoBehaviour
+{
+    [Header("=== 사용자 설정 ===")]
+    [SerializeField] private InputField usernameInput;
+    [SerializeField] private Text statusText;
+    [SerializeField] private Button checkUserButton;
+    [SerializeField] private Button autoLoginButton;
+    [SerializeField] private Button manualLoginButton;
+    
+    [Header("=== 콘텐츠 설정 ===")]
+    [SerializeField] private string testContentName = "VR Demo Experience";
+    [SerializeField] private Button startExperienceButton;
+    [SerializeField] private Button endExperienceButton;
+    
+    private VRApiManager apiManager;
+    private bool experienceRunning = false;
+    
+    void Start()
+    {
+        apiManager = FindObjectOfType<VRApiManager>();
+        if (apiManager == null)
+        {
+            Debug.LogError("VRApiManager를 찾을 수 없습니다!");
+            return;
+        }
+        
+        // 이벤트 구독
+        apiManager.OnUserLoggedIn += OnUserLoggedIn;
+        apiManager.OnUserLoggedOut += OnUserLoggedOut;
+        apiManager.OnApiError += OnApiError;
+        apiManager.OnSessionStarted += OnSessionStarted;
+        apiManager.OnSessionEnded += OnSessionEnded;
+        
+        UpdateUI();
+    }
+    
+    void OnDestroy()
+    {
+        if (apiManager != null)
+        {
+            apiManager.OnUserLoggedIn -= OnUserLoggedIn;
+            apiManager.OnUserLoggedOut -= OnUserLoggedOut;
+            apiManager.OnApiError -= OnApiError;
+            apiManager.OnSessionStarted -= OnSessionStarted;
+            apiManager.OnSessionEnded -= OnSessionEnded;
+        }
+    }
+    
+    /// <summary>
+    /// 계정 존재 여부 확인
+    /// </summary>
+    public void CheckUserAccount()
+    {
+        string username = usernameInput?.text?.Trim();
+        if (string.IsNullOrEmpty(username))
+        {
+            UpdateStatus("사용자명을 입력해주세요.");
+            return;
+        }
+        
+        UpdateStatus($"계정 확인 중: {username}...");
+        
+        StartCoroutine(apiManager.CheckUserExists(username, (exists) =>
+        {
+            if (exists)
+            {
+                UpdateStatus($"✓ 계정 존재: {username}");
+                Debug.Log($"계정이 존재합니다: {username}");
+            }
+            else
+            {
+                UpdateStatus($"✗ 계정 없음: {username} (자동 생성 가능)");
+                Debug.Log($"계정이 존재하지 않습니다: {username}");
+            }
+            UpdateUI();
+        }));
+    }
+    
+    /// <summary>
+    /// 자동 로그인 (계정이 없으면 자동 생성)
+    /// </summary>
+    public void AutoLoginUser()
+    {
+        string username = usernameInput?.text?.Trim();
+        if (string.IsNullOrEmpty(username))
+        {
+            UpdateStatus("사용자명을 입력해주세요.");
+            return;
+        }
+        
+        UpdateStatus($"자동 로그인 중: {username}...");
+        
+        StartCoroutine(apiManager.AutoLogin(username));
+    }
+    
+    /// <summary>
+    /// 수동 로그인 (기존 방식)
+    /// </summary>
+    public void ManualLoginUser()
+    {
+        string username = usernameInput?.text?.Trim();
+        if (string.IsNullOrEmpty(username))
+        {
+            UpdateStatus("사용자명을 입력해주세요.");
+            return;
+        }
+        
+        UpdateStatus($"수동 로그인 중: {username}...");
+        
+        StartCoroutine(apiManager.LoginUser(username));
+    }
+    
+    /// <summary>
+    /// VR 체험 시작 (통합 세션)
+    /// </summary>
+    public void StartVRExperience()
+    {
+        if (!apiManager.IsLoggedIn)
+        {
+            UpdateStatus("먼저 로그인해주세요.");
+            return;
+        }
+        
+        if (experienceRunning)
+        {
+            UpdateStatus("이미 체험이 진행 중입니다.");
+            return;
+        }
+        
+        apiManager.StartUnifiedSession(testContentName);
+        experienceRunning = true;
+        
+        UpdateStatus($"VR 체험 시작: {testContentName}");
+        UpdateUI();
+    }
+    
+    /// <summary>
+    /// VR 체험 종료
+    /// </summary>
+    public void EndVRExperience()
+    {
+        if (!experienceRunning)
+        {
+            UpdateStatus("진행 중인 체험이 없습니다.");
+            return;
+        }
+        
+        apiManager.EndUnifiedSession(testContentName);
+        experienceRunning = false;
+        
+        UpdateStatus($"VR 체험 종료: {testContentName}");
+        UpdateUI();
+    }
+    
+    /// <summary>
+    /// 로그아웃
+    /// </summary>
+    public void LogoutUser()
+    {
+        if (!apiManager.IsLoggedIn)
+        {
+            UpdateStatus("로그인된 사용자가 없습니다.");
+            return;
+        }
+        
+        UpdateStatus("로그아웃 중...");
+        StartCoroutine(apiManager.LogoutUser());
+    }
+    
+    private void UpdateStatus(string message)
+    {
+        if (statusText != null)
+        {
+            statusText.text = $"[{System.DateTime.Now:HH:mm:ss}] {message}";
+        }
+        Debug.Log($"Status: {message}");
+    }
+    
+    private void UpdateUI()
+    {
+        bool isLoggedIn = apiManager.IsLoggedIn;
+        bool hasUsername = !string.IsNullOrEmpty(usernameInput?.text?.Trim());
+        
+        if (checkUserButton != null)
+            checkUserButton.interactable = hasUsername && !isLoggedIn;
+            
+        if (autoLoginButton != null)
+            autoLoginButton.interactable = hasUsername && !isLoggedIn;
+            
+        if (manualLoginButton != null)
+            manualLoginButton.interactable = hasUsername && !isLoggedIn;
+            
+        if (startExperienceButton != null)
+            startExperienceButton.interactable = isLoggedIn && !experienceRunning;
+            
+        if (endExperienceButton != null)
+            endExperienceButton.interactable = isLoggedIn && experienceRunning;
+    }
+    
+    // 이벤트 핸들러
+    private void OnUserLoggedIn(UserData user, SessionData session)
+    {
+        UpdateStatus($"✓ 로그인 성공: {user.username}");
+        UpdateUI();
+    }
+    
+    private void OnUserLoggedOut()
+    {
+        UpdateStatus("로그아웃 완료");
+        experienceRunning = false;
+        UpdateUI();
+    }
+    
+    private void OnApiError(string error)
+    {
+        UpdateStatus($"❌ 오류: {error}");
+        UpdateUI();
+    }
+    
+    private void OnSessionStarted(string sessionInfo)
+    {
+        UpdateStatus($"세션 시작: {sessionInfo}");
+    }
+    
+    private void OnSessionEnded(string sessionInfo, double duration)
+    {
+        UpdateStatus($"세션 종료: {sessionInfo} (사용시간: {duration:F1}분)");
+    }
+}
+
+/// <summary>
+/// 스크립트 사용 예시: 간단한 자동화된 VR 시스템
+/// </summary>
+public class AutomatedVRSystem : MonoBehaviour
+{
+    [Header("=== 자동화 설정 ===")]
+    [SerializeField] private string[] testUsers = { "TestUser1", "TestUser2", "TestUser3" };
+    [SerializeField] private string[] contentList = { "Training Module 1", "Training Module 2", "Assessment" };
+    [SerializeField] private float sessionDuration = 30f; // 초 단위
+    
+    private VRApiManager apiManager;
+    private int currentUserIndex = 0;
+    private int currentContentIndex = 0;
+    
+    void Start()
+    {
+        apiManager = FindObjectOfType<VRApiManager>();
+        
+        if (apiManager == null)
+        {
+            Debug.LogError("VRApiManager를 찾을 수 없습니다!");
+            return;
+        }
+        
+        // 자동 테스트 시작
+        StartCoroutine(AutomatedTestSequence());
+    }
+    
+    /// <summary>
+    /// 자동화된 테스트 시퀀스
+    /// 여러 사용자로 자동 로그인하고 콘텐츠를 순차적으로 실행
+    /// </summary>
+    private IEnumerator AutomatedTestSequence()
+    {
+        Debug.Log("=== 자동화된 VR 시스템 테스트 시작 ===");
+        
+        foreach (string username in testUsers)
+        {
+            Debug.Log($"\n--- 사용자 테스트 시작: {username} ---");
+            
+            // 1. 계정 존재 확인
+            bool userExists = false;
+            yield return StartCoroutine(apiManager.CheckUserExists(username, (exists) =>
+            {
+                userExists = exists;
+                Debug.Log($"계정 존재 여부: {username} = {exists}");
+            }));
+            
+            yield return new WaitForSeconds(1f);
+            
+            // 2. 자동 로그인
+            yield return StartCoroutine(apiManager.AutoLogin(username));
+            yield return new WaitForSeconds(1f);
+            
+            if (!apiManager.IsLoggedIn)
+            {
+                Debug.LogError($"로그인 실패: {username}");
+                continue;
+            }
+            
+            // 3. 각 콘텐츠를 순차적으로 실행
+            foreach (string content in contentList)
+            {
+                Debug.Log($"콘텐츠 실행: {content}");
+                
+                // 세션 시작
+                apiManager.StartUnifiedSession(content);
+                yield return new WaitForSeconds(sessionDuration);
+                
+                // 세션 종료
+                apiManager.EndUnifiedSession(content);
+                yield return new WaitForSeconds(1f);
+            }
+            
+            // 4. 로그아웃
+            yield return StartCoroutine(apiManager.LogoutUser());
+            yield return new WaitForSeconds(2f);
+            
+            Debug.Log($"--- 사용자 테스트 완료: {username} ---");
+        }
+        
+        Debug.Log("=== 자동화된 VR 시스템 테스트 완료 ===");
+    }
+}
+
+#endregion
