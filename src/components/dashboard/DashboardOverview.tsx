@@ -88,25 +88,25 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       const monthlyLoginCount = monthlyLogins?.length || 0;
       
-      // Get daily usage count (today only)
+      // Get daily usage count (today only) - Use Korea timezone for database storage
       const today = new Date(koreaTime);
       const todayYear = today.getFullYear();
       const todayMonth = today.getMonth();
       const todayDate = today.getDate();
       
-      // Create start and end of day in Korea timezone
+      // Create start and end of day in Korea timezone - store as Korea time
       const todayStart = new Date(todayYear, todayMonth, todayDate, 0, 0, 0, 0);
       const todayEnd = new Date(todayYear, todayMonth, todayDate, 23, 59, 59, 999);
       
-      // Convert to UTC for database query
-      const todayStartUTC = new Date(todayStart.getTime() - (9 * 60 * 60 * 1000));
-      const todayEndUTC = new Date(todayEnd.getTime() - (9 * 60 * 60 * 1000));
+      // Use Korea timezone directly for database queries (store data in Korea time)
+      const todayStartKST = todayStart.toISOString();
+      const todayEndKST = todayEnd.toISOString();
       
       const { data: todayLogins } = await supabase
         .from('user_sessions')
         .select('id')
-        .gte('login_time', todayStartUTC.toISOString())
-        .lte('login_time', todayEndUTC.toISOString());
+        .gte('login_time', todayStartKST)
+        .lte('login_time', todayEndKST);
       
       const dailyLoginCount = todayLogins?.length || 0;
       
@@ -128,9 +128,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const weeklyLoginCount = weeklyLogins?.length || 0;
       setWeeklyUsage(weeklyLoginCount);
 
-      // Generate weekly data for chart (daily breakdown)
+      // Generate weekly data for chart (daily breakdown) - Use Korea timezone
       const weeklyData = await Promise.all(weekDates.map(async (date) => {
-        // Get login sessions for this specific date
+        // Get login sessions for this specific date in Korea timezone
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
@@ -150,17 +150,23 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setWeeklyData(weeklyData);
 
       // Get content play counts from vr_usage_logs - 전체 기간
-      const { data: allContentLogs } = await supabase
+      const { data: allContentLogs, error: contentError } = await supabase
         .from('vr_usage_logs')
         .select('content_name')
         .not('content_name', 'is', null);
+
+      if (contentError) {
+        console.error('Content logs fetch error:', contentError);
+      }
 
       console.log('All content logs:', allContentLogs);
 
       // Count plays by content_name for all time
       const allContentCounts = (allContentLogs || []).reduce((acc: any, log: any) => {
-        const contentName = log.content_name.toString();
-        acc[contentName] = (acc[contentName] || 0) + 1;
+        const contentName = log.content_name?.toString();
+        if (contentName) {
+          acc[contentName] = (acc[contentName] || 0) + 1;
+        }
         return acc;
       }, {});
 
