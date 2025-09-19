@@ -17,6 +17,16 @@ export const UserSessionTable = () => {
   const fetchSessions = async () => {
     setLoading(true);
     try {
+      // Ensure admin session is set before querying
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
       const { data, error } = await supabase
         .rpc('get_user_sessions_with_usernames');
 

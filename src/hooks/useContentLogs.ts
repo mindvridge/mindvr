@@ -16,6 +16,16 @@ export const useContentLogs = () => {
   const fetchLogs = async (userFilter?: string, monthFilter?: string) => {
     setLoading(true);
     try {
+      // Ensure admin session is set before querying
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
       let query = supabase
         .from('vr_usage_logs')
         .select(`
@@ -205,6 +215,16 @@ export const useContentLogs = () => {
 
   const getContentUsageStats = async (sortBy: 'usage_count' | 'total_usage_minutes' = 'total_usage_minutes'): Promise<ContentUsageStats[]> => {
     try {
+      // Ensure admin session is set
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
       const { data, error } = await supabase
         .from('vr_usage_logs')
         .select('content_name, duration_minutes')
@@ -248,6 +268,16 @@ export const useContentLogs = () => {
 
   const getUserStats = async (): Promise<UserStats[]> => {
     try {
+      // Ensure admin session is set
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
       const { data, error } = await supabase
         .from('vr_usage_logs')
         .select(`
@@ -293,6 +323,16 @@ export const useContentLogs = () => {
 
   const getTotalLoginStats = async () => {
     try {
+      // Ensure admin session is set
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
       const { data, error } = await supabase
         .from('user_sessions')
         .select(`
@@ -319,6 +359,16 @@ export const useContentLogs = () => {
 
   const getLoginSessionStats = async () => {
     try {
+      // Ensure admin session is set
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
       const { data, error } = await supabase
         .from('user_sessions')
         .select(`

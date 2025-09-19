@@ -25,9 +25,14 @@ export const useAuth = () => {
         
         // If user is admin, restore admin session for RLS policies
         if (userData.isAdmin) {
-          await supabase.rpc('set_admin_session', {
-            admin_id_value: userData.id
-          });
+          try {
+            await supabase.rpc('set_admin_session', {
+              admin_id_value: userData.id
+            });
+            console.log('Admin session restored successfully');
+          } catch (error) {
+            console.error('Failed to restore admin session:', error);
+          }
         }
       }
     } catch (error) {
