@@ -26,6 +26,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState(new Date()); // 선택된 월 관리
+  const [isDataLoading, setIsDataLoading] = useState(false); // 중복 호출 방지
   
   const { toast } = useToast();
 
@@ -81,11 +82,20 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   };
 
   const loadDashboardData = async (isRefresh = false) => {
+    // 이미 로딩 중이면 중복 호출 방지
+    if (isDataLoading) {
+      console.log('Data loading already in progress, skipping...');
+      return;
+    }
+
+    setIsDataLoading(true);
+    
     if (isRefresh) {
       setRefreshing(true);
     } else {
       setLoading(true);
     }
+    
     try {
       // First, check if user is authenticated and set admin session if needed
       const storedUser = localStorage.getItem('current_user');
@@ -100,13 +110,11 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           } catch (error) {
             console.error('Failed to set admin session:', error);
             // 관리자 세션 설정 실패 시 사용자에게 알림
-            if (isRefresh) {
-              toast({
-                title: "권한 오류",
-                description: "관리자 권한을 확인할 수 없습니다. 다시 로그인해주세요.",
-                variant: "destructive",
-              });
-            }
+            toast({
+              title: "권한 오류",
+              description: "관리자 권한을 확인할 수 없습니다. 다시 로그인해주세요.",
+              variant: "destructive",
+            });
             return;
           }
         }
@@ -318,6 +326,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setIsDataLoading(false);
     }
   };
 
@@ -330,8 +339,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   }, []);
 
   useEffect(() => {
-    // selectedMonth가 변경될 때마다 데이터 다시 로드
-    if (selectedMonth) {
+    // selectedMonth가 변경될 때마다 데이터 다시 로드 (단, 이미 로딩 중이 아닐 때만)
+    if (selectedMonth && !isDataLoading && !loading && !refreshing) {
       loadDashboardData();
     }
   }, [selectedMonth]);
