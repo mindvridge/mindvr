@@ -80,6 +80,15 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
             console.log('Admin session set for dashboard data loading');
           } catch (error) {
             console.error('Failed to set admin session:', error);
+            // 관리자 세션 설정 실패 시 사용자에게 알림
+            if (isRefresh) {
+              toast({
+                title: "권한 오류",
+                description: "관리자 권한을 확인할 수 없습니다. 다시 로그인해주세요.",
+                variant: "destructive",
+              });
+            }
+            return;
           }
         }
       }
@@ -140,22 +149,16 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setMonthlyUsage(monthlyLoginCount);
       setDailyUsage(dailyLoginCount);
 
-      // Get weekly usage count (this week total)
-      const weekDates = getKoreanWeekDates();
-      const weekStart = weekDates[0];
-      const weekEnd = weekDates[weekDates.length - 1];
-      weekEnd.setHours(23, 59, 59, 999);
-      
-      const { data: weeklyLogins } = await supabase
+      // Get total usage count (all time)
+      const { data: totalLogins } = await supabase
         .from('user_sessions')
-        .select('id')
-        .gte('login_time', weekStart.toISOString())
-        .lte('login_time', weekEnd.toISOString());
+        .select('id');
       
-      const weeklyLoginCount = weeklyLogins?.length || 0;
-      setWeeklyUsage(weeklyLoginCount);
+      const totalLoginCount = totalLogins?.length || 0;
+      setWeeklyUsage(totalLoginCount);
 
       // Generate weekly data for chart (daily breakdown) - Use Korea timezone
+      const weekDates = getKoreanWeekDates();
       const weeklyData = await Promise.all(weekDates.map(async (date) => {
         // Get login sessions for this specific date in Korea timezone
         const startOfDay = new Date(date);
@@ -377,7 +380,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold">{weeklyUsage}</p>
-                <p className="text-sm text-muted-foreground">주간 누적 이용 횟수</p>
+                <p className="text-sm text-muted-foreground">총 누적 이용 횟수</p>
               </div>
               <Users className="h-8 w-8 text-primary" />
             </div>
@@ -390,7 +393,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         {/* Weekly Usage Line Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>주간 누적 이용 횟수</CardTitle>
+            <CardTitle>일별 이용 횟수 (최근 7일)</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer

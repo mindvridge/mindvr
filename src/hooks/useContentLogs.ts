@@ -20,10 +20,21 @@ export const useContentLogs = () => {
       const storedUser = localStorage.getItem('current_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
-        if (userData.isAdmin) {
-          await supabase.rpc('set_admin_session', {
-            admin_id_value: userData.id
-          });
+        if (userData.isAdmin || userData.id) {
+          try {
+            await supabase.rpc('set_admin_session', {
+              admin_id_value: userData.id
+            });
+            console.log('Admin session set for content logs');
+          } catch (error) {
+            console.error('Failed to set admin session:', error);
+            toast({
+              title: '권한 오류',
+              description: '관리자 권한을 확인할 수 없습니다. 다시 로그인해주세요.',
+              variant: 'destructive',
+            });
+            return;
+          }
         }
       }
       let query = supabase
