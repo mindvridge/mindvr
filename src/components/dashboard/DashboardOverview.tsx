@@ -83,7 +83,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
 
   const loadDashboardData = async (isRefresh = false) => {
     // 이미 로딩 중이면 중복 호출 방지
-    if (isDataLoading) {
+    if (isDataLoading && !isRefresh) {
       console.log('Data loading already in progress, skipping...');
       return;
     }
@@ -316,22 +316,49 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
 
     } catch (error) {
       console.error('대시보드 데이터 로딩 실패:', error);
-      if (isRefresh) {
-        toast({
-          title: "새로고침 실패",
-          description: "데이터를 가져오는 중 오류가 발생했습니다.",
-          variant: "destructive",
-        });
-      }
+      
+      // 에러 시 상태 초기화
+      setMonthlyUsage(0);
+      setDailyUsage(0);
+      setWeeklyUsage(0);
+      setWeeklyData([]);
+      setContentData([]);
+      setTopContent([]);
+      
+      toast({
+        title: "데이터 로딩 실패",
+        description: "데이터를 가져오는 중 오류가 발생했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      });
     } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setIsDataLoading(false);
+      // 로딩 상태를 안전하게 해제
+      setTimeout(() => {
+        setLoading(false);
+        setRefreshing(false);
+        setIsDataLoading(false);
+      }, 50);
     }
   };
 
   const handleRefresh = () => {
-    loadDashboardData(true);
+    // 새로고침 시 모든 상태 초기화
+    setMonthlyUsage(0);
+    setDailyUsage(0);
+    setWeeklyUsage(0);
+    setWeeklyData([]);
+    setContentData([]);
+    setTopContent([]);
+    setLastUpdated('');
+    
+    // 로딩 상태 강제 초기화
+    setIsDataLoading(false);
+    setRefreshing(false);
+    setLoading(false);
+    
+    // 약간의 딜레이 후 데이터 로드
+    setTimeout(() => {
+      loadDashboardData(true);
+    }, 100);
   };
 
   useEffect(() => {
