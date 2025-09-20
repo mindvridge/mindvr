@@ -5,7 +5,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trophy, Clock, Users, RefreshCw } from 'lucide-react';
+import { Trophy, Clock, Users, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -25,6 +25,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date()); // 선택된 월 관리
   
   const { toast } = useToast();
 
@@ -49,16 +50,34 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     return weekDates;
   };
 
-  const getKoreanMonthRange = () => {
-    const now = new Date();
-    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
-    const year = koreaTime.getFullYear();
-    const month = koreaTime.getMonth();
+  const getKoreanMonthRange = (selectedDate?: Date) => {
+    const baseDate = selectedDate || selectedMonth;
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
     
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
     
     return { monthStart, monthEnd };
+  };
+
+  const handlePreviousMonth = () => {
+    const newMonth = new Date(selectedMonth);
+    newMonth.setMonth(selectedMonth.getMonth() - 1);
+    setSelectedMonth(newMonth);
+  };
+
+  const handleNextMonth = () => {
+    const newMonth = new Date(selectedMonth);
+    newMonth.setMonth(selectedMonth.getMonth() + 1);
+    setSelectedMonth(newMonth);
+  };
+
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleDateString('ko-KR', { 
+      year: 'numeric', 
+      month: 'long' 
+    });
   };
 
   const loadDashboardData = async (isRefresh = false) => {
@@ -103,8 +122,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const now = new Date();
       const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
       
-      // Get monthly usage count (this month)
-      const { monthStart, monthEnd } = getKoreanMonthRange();
+      // Get monthly usage count (selected month)
+      const { monthStart, monthEnd } = getKoreanMonthRange(selectedMonth);
       const { data: monthlyLogins } = await supabase
         .from('user_sessions')
         .select('id')
@@ -310,6 +329,13 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     loadDashboardData();
   }, []);
 
+  useEffect(() => {
+    // selectedMonth가 변경될 때마다 데이터 다시 로드
+    if (selectedMonth) {
+      loadDashboardData();
+    }
+  }, [selectedMonth]);
+
   const today = new Date().toISOString().split('T')[0];
 
   if (loading) {
@@ -327,7 +353,30 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePreviousMonth}
+              className="h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium min-w-[120px] text-center">
+              {formatMonthYear(selectedMonth)}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNextMonth}
+              className="h-8 w-8"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
         <div className="flex items-center gap-4">
           <div className="flex flex-col text-right">
             <span className="text-muted-foreground">{today}</span>
@@ -356,7 +405,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold">{monthlyUsage}</p>
-                <p className="text-sm text-muted-foreground">월간 이용 횟수</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatMonthYear(selectedMonth)} 이용 횟수
+                </p>
               </div>
               <Users className="h-8 w-8 text-primary" />
             </div>
