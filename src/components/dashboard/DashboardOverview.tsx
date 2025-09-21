@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Trophy, Clock, Users, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getCurrentKoreanTime, formatToKoreanTime } from '@/lib/dateUtils';
 
 interface DashboardOverviewProps {
   getContentUsageStats: () => Promise<any[]>;
@@ -37,15 +38,14 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   };
 
   const getKoreanWeekDates = () => {
-    const now = new Date();
-    const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
-    const day = koreaTime.getDay();
+    const now = getCurrentKoreanTime();
+    const day = now.getDay();
     const mondayOffset = day === 0 ? -6 : 1 - day; // 월요일을 주의 시작으로
     
     const weekDates = [];
     for (let i = 0; i < 7; i++) {
-      const date = new Date(koreaTime);
-      date.setDate(koreaTime.getDate() + mondayOffset + i);
+      const date = new Date(now);
+      date.setDate(now.getDate() + mondayOffset + i);
       weekDates.push(date);
     }
     return weekDates;
@@ -127,8 +127,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       ]);
 
       // Calculate Korean timezone dates
-      const now = new Date();
-      const koreaTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
+      const now = getCurrentKoreanTime();
       
       // Get monthly usage count (selected month)
       const { monthStart, monthEnd } = getKoreanMonthRange(selectedMonth);
@@ -140,13 +139,13 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       const monthlyLoginCount = monthlyLogins?.length || 0;
       
-      // Get daily usage count (today only) - Convert Korea time to UTC for DB query
-      const today = new Date(koreaTime);
+      // Get daily usage count (today only) - Use Korean time properly
+      const today = new Date(now);
       const todayYear = today.getFullYear();
       const todayMonth = today.getMonth();
       const todayDate = today.getDate();
       
-      // Create start and end of day in Korea timezone
+      // Create start and end of day in Korean timezone, then convert to UTC for DB query
       const todayStartKST = new Date(todayYear, todayMonth, todayDate, 0, 0, 0, 0);
       const todayEndKST = new Date(todayYear, todayMonth, todayDate, 23, 59, 59, 999);
       
@@ -155,7 +154,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const todayEndUTC = new Date(todayEndKST.getTime() - (9 * 60 * 60 * 1000));
       
       console.log('Daily usage calculation:');
-      console.log('Korea Time:', koreaTime);
+      console.log('Korea Time:', now);
       console.log('Today Start KST:', todayStartKST.toISOString());
       console.log('Today End KST:', todayEndKST.toISOString());
       console.log('Today Start UTC:', todayStartUTC.toISOString());
@@ -193,11 +192,15 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
+        // Convert to UTC for database query
+        const startOfDayUTC = new Date(startOfDay.getTime() - (9 * 60 * 60 * 1000));
+        const endOfDayUTC = new Date(endOfDay.getTime() - (9 * 60 * 60 * 1000));
+
         const { data: dayLogins } = await supabase
           .from('user_sessions')
           .select('id')
-          .gte('login_time', startOfDay.toISOString())
-          .lte('login_time', endOfDay.toISOString());
+          .gte('login_time', startOfDayUTC.toISOString())
+          .lte('login_time', endOfDayUTC.toISOString());
 
         return {
           date: `${date.getMonth() + 1}/${date.getDate()}`,
@@ -247,16 +250,25 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const weekDatesForTop3 = getKoreanWeekDates();
       const weekStartForTop3 = weekDatesForTop3[0];
       const weekEndForTop3 = weekDatesForTop3[weekDatesForTop3.length - 1];
-      weekEndForTop3.setHours(23, 59, 59, 999);
       
-      console.log('Week range for TOP3:', weekStartForTop3.toISOString(), 'to', weekEndForTop3.toISOString());
+      // Set start of week (Monday 00:00:00) and end of week (Sunday 23:59:59) in KST
+      const weekStartKST = new Date(weekStartForTop3);
+      weekStartKST.setHours(0, 0, 0, 0);
+      const weekEndKST = new Date(weekEndForTop3);
+      weekEndKST.setHours(23, 59, 59, 999);
+      
+      // Convert to UTC for database query
+      const weekStartUTC = new Date(weekStartKST.getTime() - (9 * 60 * 60 * 1000));
+      const weekEndUTC = new Date(weekEndKST.getTime() - (9 * 60 * 60 * 1000));
+      
+      console.log('Week range for TOP3:', weekStartUTC.toISOString(), 'to', weekEndUTC.toISOString());
       
       const { data: weeklyContentLogs } = await supabase
         .from('vr_usage_logs')
         .select('content_name, duration_minutes, start_time')
         .not('content_name', 'is', null)
-        .gte('start_time', weekStartForTop3.toISOString())
-        .lte('start_time', weekEndForTop3.toISOString());
+        .gte('start_time', weekStartUTC.toISOString())
+        .lte('start_time', weekEndUTC.toISOString());
 
       console.log('Weekly content logs:', weeklyContentLogs);
 
@@ -301,7 +313,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setTopContent(top3Content);
       
       // 성공 시 마지막 업데이트 시간 설정 및 토스트
-      setLastUpdated(koreaTime.toLocaleTimeString('ko-KR', { 
+      setLastUpdated(now.toLocaleTimeString('ko-KR', { 
         hour: '2-digit', 
         minute: '2-digit', 
         second: '2-digit' 
