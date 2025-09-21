@@ -28,6 +28,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState(new Date()); // 선택된 월 관리
   const [isDataLoading, setIsDataLoading] = useState(false); // 중복 호출 방지
+  const [refreshKey, setRefreshKey] = useState(0); // 강제 새로고침용
   
   const { toast } = useToast();
 
@@ -81,9 +82,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     });
   };
 
-  const loadDashboardData = async (isRefresh = false) => {
-    // 이미 로딩 중이면 중복 호출 방지 (새로고침은 예외)
-    if (isDataLoading && !isRefresh) {
+  const loadDashboardData = async (isRefresh = false, forceLoad = false) => {
+    // 이미 로딩 중이면 중복 호출 방지 (새로고침이나 강제 로드는 예외)
+    if (isDataLoading && !isRefresh && !forceLoad) {
       console.log('Data loading already in progress, skipping...');
       return;
     }
@@ -379,19 +380,28 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     setRefreshing(false);
     setLoading(false);
     
-    // 즉시 데이터 로드 (딜레이 제거)
-    loadDashboardData(true);
+    // refreshKey 증가로 강제 새로고침
+    setRefreshKey(prev => prev + 1);
+    
+    // 강제 로드로 즉시 데이터 로드
+    setTimeout(() => {
+      loadDashboardData(true, true);
+    }, 50);
   };
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [refreshKey]); // refreshKey 의존성 추가
 
   useEffect(() => {
-    // selectedMonth가 변경될 때마다 데이터 다시 로드 (단, 이미 로딩 중이 아닐 때만)
-    if (selectedMonth && !isDataLoading && !loading && !refreshing) {
-      loadDashboardData();
-    }
+    // selectedMonth가 변경될 때마다 데이터 다시 로드
+    const timeoutId = setTimeout(() => {
+      if (!isDataLoading) {
+        loadDashboardData(false, true); // 강제 로드로 확실히 실행
+      }
+    }, 100); // 짧은 딜레이로 중복 호출 방지
+    
+    return () => clearTimeout(timeoutId);
   }, [selectedMonth]);
 
   const today = new Date().toISOString().split('T')[0];
