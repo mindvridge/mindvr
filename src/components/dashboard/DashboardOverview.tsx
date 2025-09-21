@@ -82,19 +82,20 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   };
 
   const loadDashboardData = async (isRefresh = false) => {
-    // 이미 로딩 중이면 중복 호출 방지
+    // 이미 로딩 중이면 중복 호출 방지 (새로고침은 예외)
     if (isDataLoading && !isRefresh) {
       console.log('Data loading already in progress, skipping...');
       return;
     }
 
-    setIsDataLoading(true);
-    
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    try {
+      setIsDataLoading(true);
+      
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
     
     try {
       // First, check if user is authenticated and set admin session if needed
@@ -343,12 +344,23 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         variant: "destructive",
       });
     } finally {
-      // 로딩 상태를 안전하게 해제
-      setTimeout(() => {
-        setLoading(false);
-        setRefreshing(false);
-        setIsDataLoading(false);
-      }, 50);
+      // 로딩 상태를 즉시 해제하되, React 배치 업데이트 고려
+      setLoading(false);
+      setRefreshing(false);
+      setIsDataLoading(false);
+    }
+    } catch (outerError) {
+      // 전체 함수 레벨에서 예상치 못한 에러 처리
+      console.error('Unexpected error in loadDashboardData:', outerError);
+      setLoading(false);
+      setRefreshing(false);
+      setIsDataLoading(false);
+      
+      toast({
+        title: "시스템 오류",
+        description: "예상치 못한 오류가 발생했습니다. 페이지를 새로고침해주세요.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -367,10 +379,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     setRefreshing(false);
     setLoading(false);
     
-    // 약간의 딜레이 후 데이터 로드
-    setTimeout(() => {
-      loadDashboardData(true);
-    }, 100);
+    // 즉시 데이터 로드 (딜레이 제거)
+    loadDashboardData(true);
   };
 
   useEffect(() => {
