@@ -26,9 +26,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
-  const [selectedWeek, setSelectedWeek] = useState(new Date()); // 선택된 주 관리
-  const [isDataLoading, setIsDataLoading] = useState(false); // 중복 호출 방지
-  const [refreshKey, setRefreshKey] = useState(0); // 강제 새로고침용
+  const [selectedWeek, setSelectedWeek] = useState(new Date());
+  const [isDataLoading, setIsDataLoading] = useState(false);
   
   const { toast } = useToast();
 
@@ -38,24 +37,10 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     return hours > 0 ? `${hours}.${Math.round((mins / 60) * 10)}시간` : `${mins}분`;
   };
 
-  const getKoreanWeekDates = () => {
-    const now = getCurrentKoreanTime();
-    const day = now.getDay();
-    const mondayOffset = day === 0 ? -6 : 1 - day; // 월요일을 주의 시작으로
-    
-    const weekDates = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(now);
-      date.setDate(now.getDate() + mondayOffset + i);
-      weekDates.push(date);
-    }
-    return weekDates;
-  };
-
   const getKoreanWeekRange = (selectedDate?: Date) => {
     const baseDate = selectedDate || selectedWeek;
     const day = baseDate.getDay();
-    const mondayOffset = day === 0 ? -6 : 1 - day; // 월요일을 주의 시작으로
+    const mondayOffset = day === 0 ? -6 : 1 - day;
     
     const weekStart = new Date(baseDate);
     weekStart.setDate(baseDate.getDate() + mondayOffset);
@@ -87,12 +72,13 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     return `${startStr} ~ ${endStr}`;
   };
 
-  const loadDashboardData = async (isRefresh = false, forceLoad = false) => {
-    // 이미 로딩 중이면 중복 호출 방지 (새로고침이나 강제 로드는 예외)
-    if (isDataLoading && !isRefresh && !forceLoad) {
+  const loadDashboardData = async (isRefresh = false) => {
+    if (isDataLoading && !isRefresh) {
       console.log('Data loading already in progress, skipping...');
       return;
     }
+
+    console.log('Loading dashboard data...', { isRefresh, selectedWeek });
 
     try {
       setIsDataLoading(true);
@@ -102,47 +88,28 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       } else {
         setLoading(true);
       }
-    
-    try {
-      // First, check if user is authenticated and set admin session if needed
+
+      // Set admin session
       const storedUser = localStorage.getItem('current_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         if (userData.isAdmin || userData.id) {
-          try {
-            await supabase.rpc('set_admin_session', {
-              admin_id_value: userData.id
-            });
-            console.log('Admin session set for dashboard data loading');
-          } catch (error) {
-            console.error('Failed to set admin session:', error);
-            // 관리자 세션 설정 실패 시 사용자에게 알림
-            toast({
-              title: "권한 오류",
-              description: "관리자 권한을 확인할 수 없습니다. 다시 로그인해주세요.",
-              variant: "destructive",
-            });
-            return;
-          }
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
         }
       }
 
-      const [contentStats, userStats, sessionStats] = await Promise.all([
-        getContentUsageStats(),
-        getUserStats(),
-        getLoginSessionStats()
-      ]);
-
-      // Calculate Korean timezone dates
       const now = getCurrentKoreanTime();
       
-      // Get weekly usage count (selected week)
+      // Get selected week range
       const { weekStart, weekEnd } = getKoreanWeekRange(selectedWeek);
-      
-      // Convert to UTC for database query
       const weekStartUTC = new Date(weekStart.getTime() - (9 * 60 * 60 * 1000));
       const weekEndUTC = new Date(weekEnd.getTime() - (9 * 60 * 60 * 1000));
       
+      console.log('Week range:', weekStartUTC.toISOString(), 'to', weekEndUTC.toISOString());
+
+      // Get weekly usage count
       const { data: weeklyLogins } = await supabase
         .from('user_sessions')
         .select('id')
@@ -150,53 +117,33 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         .lte('login_time', weekEndUTC.toISOString());
       
       const weeklyLoginCount = weeklyLogins?.length || 0;
+      setWeeklyUsage(weeklyLoginCount);
       
-      // Get daily usage count (current day within selected week)
-      const { weekStart: dailyWeekStart, weekEnd: dailyWeekEnd } = getKoreanWeekRange(selectedWeek);
+      // Get daily usage count (current day or selected week's first day)
       const today = new Date(now);
-      
-      // Check if today falls within the selected week
       let targetDate = today;
-      if (today < dailyWeekStart || today > dailyWeekEnd) {
-        // If today is not in selected week, use the first day of selected week
-        targetDate = dailyWeekStart;
+      if (today < weekStart || today > weekEnd) {
+        targetDate = weekStart;
       }
       
-      const targetYear = targetDate.getFullYear();
-      const targetMonth = targetDate.getMonth();
-      const targetDateNum = targetDate.getDate();
+      const dayStart = new Date(targetDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(targetDate);
+      dayEnd.setHours(23, 59, 59, 999);
       
-      // Create start and end of target day in Korean timezone, then convert to UTC for DB query
-      const todayStartKST = new Date(targetYear, targetMonth, targetDateNum, 0, 0, 0, 0);
-      const todayEndKST = new Date(targetYear, targetMonth, targetDateNum, 23, 59, 59, 999);
+      const dayStartUTC = new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
+      const dayEndUTC = new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
       
-      // Convert to UTC for database query (subtract 9 hours)
-      const todayStartUTC = new Date(todayStartKST.getTime() - (9 * 60 * 60 * 1000));
-      const todayEndUTC = new Date(todayEndKST.getTime() - (9 * 60 * 60 * 1000));
-      
-      console.log('Daily usage calculation:');
-      console.log('Korea Time:', now);
-      console.log('Today Start KST:', todayStartKST.toISOString());
-      console.log('Today End KST:', todayEndKST.toISOString());
-      console.log('Today Start UTC:', todayStartUTC.toISOString());
-      console.log('Today End UTC:', todayEndUTC.toISOString());
-      
-      const { data: todayLogins, error: dailyError } = await supabase
+      const { data: todayLogins } = await supabase
         .from('user_sessions')
-        .select('id, login_time')
-        .gte('login_time', todayStartUTC.toISOString())
-        .lte('login_time', todayEndUTC.toISOString());
-      
-      console.log('Today logins query result:', todayLogins);
-      console.log('Daily query error:', dailyError);
+        .select('id')
+        .gte('login_time', dayStartUTC.toISOString())
+        .lte('login_time', dayEndUTC.toISOString());
       
       const dailyLoginCount = todayLogins?.length || 0;
-      console.log('Daily login count:', dailyLoginCount);
-      
-      setWeeklyUsage(weeklyLoginCount);
       setDailyUsage(dailyLoginCount);
 
-      // Get total usage count (all time)
+      // Get total usage count
       const { data: totalLogins } = await supabase
         .from('user_sessions')
         .select('id');
@@ -204,54 +151,46 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const totalLoginCount = totalLogins?.length || 0;
       setTotalUsage(totalLoginCount);
 
-      // Generate weekly data for chart (daily breakdown) for selected week
-      const { weekStart: chartWeekStart, weekEnd: chartWeekEnd } = getKoreanWeekRange(selectedWeek);
+      // Generate weekly chart data
       const weekDates = [];
       for (let i = 0; i < 7; i++) {
-        const date = new Date(chartWeekStart);
-        date.setDate(chartWeekStart.getDate() + i);
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
         weekDates.push(date);
       }
-      const weeklyData = await Promise.all(weekDates.map(async (date) => {
-        // Get login sessions for this specific date in Korea timezone
+
+      const weeklyChartData = await Promise.all(weekDates.map(async (date) => {
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // Convert to UTC for database query
-        const startOfDayUTC = new Date(startOfDay.getTime() - (9 * 60 * 60 * 1000));
-        const endOfDayUTC = new Date(endOfDay.getTime() - (9 * 60 * 60 * 1000));
+        const startUTC = new Date(startOfDay.getTime() - (9 * 60 * 60 * 1000));
+        const endUTC = new Date(endOfDay.getTime() - (9 * 60 * 60 * 1000));
 
         const { data: dayLogins } = await supabase
           .from('user_sessions')
           .select('id')
-          .gte('login_time', startOfDayUTC.toISOString())
-          .lte('login_time', endOfDayUTC.toISOString());
+          .gte('login_time', startUTC.toISOString())
+          .lte('login_time', endUTC.toISOString());
 
         return {
           date: `${date.getMonth() + 1}/${date.getDate()}`,
           count: dayLogins?.length || 0
         };
       }));
-      setWeeklyData(weeklyData);
+      
+      setWeeklyData(weeklyChartData);
 
-      // Get content play counts from vr_usage_logs for selected week
-      const { data: allContentLogs, error: contentError } = await supabase
+      // Get content usage data for selected week
+      const { data: contentLogs } = await supabase
         .from('vr_usage_logs')
         .select('content_name')
         .not('content_name', 'is', null)
         .gte('start_time', weekStartUTC.toISOString())
         .lte('start_time', weekEndUTC.toISOString());
 
-      if (contentError) {
-        console.error('Content logs fetch error:', contentError);
-      }
-
-      console.log('All content logs:', allContentLogs);
-
-      // Count plays by content_name for selected week
-      const allContentCounts = (allContentLogs || []).reduce((acc: any, log: any) => {
+      const contentCounts = (contentLogs || []).reduce((acc: any, log: any) => {
         const contentName = log.content_name?.toString();
         if (contentName) {
           acc[contentName] = (acc[contentName] || 0) + 1;
@@ -259,41 +198,25 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         return acc;
       }, {});
 
-      console.log('All content counts:', allContentCounts);
-
-      // Prepare content data for bar chart (always 8 items: 1-8)
       const contentChartData = Array.from({ length: 8 }, (_, index) => {
         const contentName = (index + 1).toString();
-        const count = allContentCounts[contentName] || 0;
-        console.log(`Content ${contentName}: ${count}`);
+        const count = contentCounts[contentName] || 0;
         return {
           name: contentName,
           count: count
         };
       });
       
-      console.log('Content chart data:', contentChartData);
       setContentData(contentChartData);
 
-      // Get weekly TOP3 content for selected week
-      const { weekStart: top3WeekStart, weekEnd: top3WeekEnd } = getKoreanWeekRange(selectedWeek);
-      
-      // Convert to UTC for database query
-      const top3WeekStartUTC = new Date(top3WeekStart.getTime() - (9 * 60 * 60 * 1000));
-      const top3WeekEndUTC = new Date(top3WeekEnd.getTime() - (9 * 60 * 60 * 1000));
-      
-      console.log('Week range for TOP3:', top3WeekStartUTC.toISOString(), 'to', top3WeekEndUTC.toISOString());
-      
+      // Get TOP3 content for selected week
       const { data: weeklyContentLogs } = await supabase
         .from('vr_usage_logs')
         .select('content_name, duration_minutes, start_time')
         .not('content_name', 'is', null)
-        .gte('start_time', top3WeekStartUTC.toISOString())
-        .lte('start_time', top3WeekEndUTC.toISOString());
+        .gte('start_time', weekStartUTC.toISOString())
+        .lte('start_time', weekEndUTC.toISOString());
 
-      console.log('Weekly content logs:', weeklyContentLogs);
-
-      // Count weekly plays and calculate averages
       const weeklyContentStats = (weeklyContentLogs || []).reduce((acc: any, log: any) => {
         const contentName = log.content_name.toString();
         if (!acc[contentName]) {
@@ -307,9 +230,6 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         return acc;
       }, {});
 
-      console.log('Weekly content stats:', weeklyContentStats);
-
-      // Convert to array and sort by play count
       const weeklyTopContent = Object.entries(weeklyContentStats)
         .map(([contentName, stats]: [string, any]) => ({
           contentName,
@@ -319,9 +239,6 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         .sort((a, b) => b.playCount - a.playCount)
         .slice(0, 3);
 
-      console.log('Weekly top content:', weeklyTopContent);
-
-      // Prepare top 3 content for table
       const top3Content = weeklyTopContent.map((item, index) => ({
         rank: index + 1,
         contentVersion: parseInt(item.contentName) || 1,
@@ -330,10 +247,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         avgTime: formatMinutes(item.avgDuration)
       }));
       
-      console.log('Top 3 content for display:', top3Content);
       setTopContent(top3Content);
       
-      // 성공 시 마지막 업데이트 시간 설정 및 토스트
+      // Update timestamp
       setLastUpdated(now.toLocaleTimeString('ko-KR', { 
         hour: '2-digit', 
         minute: '2-digit', 
@@ -348,9 +264,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       }
 
     } catch (error) {
-      console.error('대시보드 데이터 로딩 실패:', error);
+      console.error('Dashboard data loading failed:', error);
       
-      // 에러 시 상태 초기화
       setWeeklyUsage(0);
       setDailyUsage(0);
       setTotalUsage(0);
@@ -364,28 +279,14 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         variant: "destructive",
       });
     } finally {
-      // 로딩 상태를 즉시 해제하되, React 배치 업데이트 고려
       setLoading(false);
       setRefreshing(false);
       setIsDataLoading(false);
-    }
-    } catch (outerError) {
-      // 전체 함수 레벨에서 예상치 못한 에러 처리
-      console.error('Unexpected error in loadDashboardData:', outerError);
-      setLoading(false);
-      setRefreshing(false);
-      setIsDataLoading(false);
-      
-      toast({
-        title: "시스템 오류",
-        description: "예상치 못한 오류가 발생했습니다. 페이지를 새로고침해주세요.",
-        variant: "destructive",
-      });
     }
   };
 
   const handleRefresh = () => {
-    // 새로고침 시 모든 상태 초기화
+    console.log('Manual refresh triggered');
     setWeeklyUsage(0);
     setDailyUsage(0);
     setTotalUsage(0);
@@ -393,34 +294,19 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     setContentData([]);
     setTopContent([]);
     setLastUpdated('');
-    
-    // 로딩 상태 강제 초기화
     setIsDataLoading(false);
-    setRefreshing(false);
-    setLoading(false);
     
-    // refreshKey 증가로 강제 새로고침
-    setRefreshKey(prev => prev + 1);
-    
-    // 강제 로드로 즉시 데이터 로드
-    setTimeout(() => {
-      loadDashboardData(true, true);
-    }, 50);
+    loadDashboardData(true);
   };
 
   useEffect(() => {
+    console.log('Initial load');
     loadDashboardData();
-  }, [refreshKey]); // refreshKey 의존성 추가
+  }, []);
 
   useEffect(() => {
-    // selectedWeek가 변경될 때마다 데이터 다시 로드
-    const timeoutId = setTimeout(() => {
-      if (!isDataLoading) {
-        loadDashboardData(false, true); // 강제 로드로 확실히 실행
-      }
-    }, 100); // 짧은 딜레이로 중복 호출 방지
-    
-    return () => clearTimeout(timeoutId);
+    console.log('Selected week changed:', selectedWeek);
+    loadDashboardData();
   }, [selectedWeek]);
 
   const today = new Date().toISOString().split('T')[0];
@@ -531,7 +417,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         {/* Weekly Usage Line Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>일별 이용 횟수 (최근 7일)</CardTitle>
+            <CardTitle>일별 이용 횟수 (선택된 주)</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -565,7 +451,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         {/* Content Usage Bar Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>콘텐츠별 재생 횟수</CardTitle>
+            <CardTitle>콘텐츠별 재생 횟수 (선택된 주)</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -607,7 +493,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
-            콘텐츠 TOP3 (이용 차례)
+            콘텐츠 TOP3 (선택된 주)
           </CardTitle>
         </CardHeader>
         <CardContent>
