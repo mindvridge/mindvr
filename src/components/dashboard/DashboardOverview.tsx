@@ -151,15 +151,24 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       const weeklyLoginCount = weeklyLogins?.length || 0;
       
-      // Get daily usage count (today only) - Use Korean time properly
+      // Get daily usage count (current day within selected week)
+      const { weekStart: dailyWeekStart, weekEnd: dailyWeekEnd } = getKoreanWeekRange(selectedWeek);
       const today = new Date(now);
-      const todayYear = today.getFullYear();
-      const todayMonth = today.getMonth();
-      const todayDate = today.getDate();
       
-      // Create start and end of day in Korean timezone, then convert to UTC for DB query
-      const todayStartKST = new Date(todayYear, todayMonth, todayDate, 0, 0, 0, 0);
-      const todayEndKST = new Date(todayYear, todayMonth, todayDate, 23, 59, 59, 999);
+      // Check if today falls within the selected week
+      let targetDate = today;
+      if (today < dailyWeekStart || today > dailyWeekEnd) {
+        // If today is not in selected week, use the first day of selected week
+        targetDate = dailyWeekStart;
+      }
+      
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = targetDate.getMonth();
+      const targetDateNum = targetDate.getDate();
+      
+      // Create start and end of target day in Korean timezone, then convert to UTC for DB query
+      const todayStartKST = new Date(targetYear, targetMonth, targetDateNum, 0, 0, 0, 0);
+      const todayEndKST = new Date(targetYear, targetMonth, targetDateNum, 23, 59, 59, 999);
       
       // Convert to UTC for database query (subtract 9 hours)
       const todayStartUTC = new Date(todayStartKST.getTime() - (9 * 60 * 60 * 1000));
@@ -195,8 +204,14 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const totalLoginCount = totalLogins?.length || 0;
       setTotalUsage(totalLoginCount);
 
-      // Generate weekly data for chart (daily breakdown) - Use Korea timezone
-      const weekDates = getKoreanWeekDates();
+      // Generate weekly data for chart (daily breakdown) for selected week
+      const { weekStart: chartWeekStart, weekEnd: chartWeekEnd } = getKoreanWeekRange(selectedWeek);
+      const weekDates = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(chartWeekStart);
+        date.setDate(chartWeekStart.getDate() + i);
+        weekDates.push(date);
+      }
       const weeklyData = await Promise.all(weekDates.map(async (date) => {
         // Get login sessions for this specific date in Korea timezone
         const startOfDay = new Date(date);
@@ -221,11 +236,13 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       }));
       setWeeklyData(weeklyData);
 
-      // Get content play counts from vr_usage_logs - 전체 기간
+      // Get content play counts from vr_usage_logs for selected week
       const { data: allContentLogs, error: contentError } = await supabase
         .from('vr_usage_logs')
         .select('content_name')
-        .not('content_name', 'is', null);
+        .not('content_name', 'is', null)
+        .gte('start_time', weekStartUTC.toISOString())
+        .lte('start_time', weekEndUTC.toISOString());
 
       if (contentError) {
         console.error('Content logs fetch error:', contentError);
@@ -233,7 +250,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
 
       console.log('All content logs:', allContentLogs);
 
-      // Count plays by content_name for all time
+      // Count plays by content_name for selected week
       const allContentCounts = (allContentLogs || []).reduce((acc: any, log: any) => {
         const contentName = log.content_name?.toString();
         if (contentName) {
@@ -258,20 +275,12 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       console.log('Content chart data:', contentChartData);
       setContentData(contentChartData);
 
-      // Get weekly TOP3 content (Korean time zone)
-      const weekDatesForTop3 = getKoreanWeekDates();
-      const weekStartForTop3 = weekDatesForTop3[0];
-      const weekEndForTop3 = weekDatesForTop3[weekDatesForTop3.length - 1];
-      
-      // Set start of week (Monday 00:00:00) and end of week (Sunday 23:59:59) in KST
-      const weekStartKST = new Date(weekStartForTop3);
-      weekStartKST.setHours(0, 0, 0, 0);
-      const weekEndKST = new Date(weekEndForTop3);
-      weekEndKST.setHours(23, 59, 59, 999);
+      // Get weekly TOP3 content for selected week
+      const { weekStart: top3WeekStart, weekEnd: top3WeekEnd } = getKoreanWeekRange(selectedWeek);
       
       // Convert to UTC for database query
-      const top3WeekStartUTC = new Date(weekStartKST.getTime() - (9 * 60 * 60 * 1000));
-      const top3WeekEndUTC = new Date(weekEndKST.getTime() - (9 * 60 * 60 * 1000));
+      const top3WeekStartUTC = new Date(top3WeekStart.getTime() - (9 * 60 * 60 * 1000));
+      const top3WeekEndUTC = new Date(top3WeekEnd.getTime() - (9 * 60 * 60 * 1000));
       
       console.log('Week range for TOP3:', top3WeekStartUTC.toISOString(), 'to', top3WeekEndUTC.toISOString());
       
