@@ -426,6 +426,17 @@ export const useContentLogs = () => {
     try {
       const XLSX = await import('xlsx');
       
+      // Ensure admin session is set before export
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
+      
       // Fetch all logs for export (without filters)
       const { data: allLogs, error } = await supabase
         .from('vr_usage_logs')

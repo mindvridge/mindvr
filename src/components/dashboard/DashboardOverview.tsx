@@ -73,16 +73,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   };
 
   const loadDashboardData = async (isRefresh = false) => {
-    if (isDataLoading && !isRefresh) {
-      console.log('Data loading already in progress, skipping...');
-      return;
-    }
-
     console.log('Loading dashboard data...', { isRefresh, selectedWeek });
 
     try {
-      setIsDataLoading(true);
-      
       if (isRefresh) {
         setRefreshing(true);
       } else {
@@ -281,21 +274,11 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     } finally {
       setLoading(false);
       setRefreshing(false);
-      setIsDataLoading(false);
     }
   };
 
   const handleRefresh = () => {
     console.log('Manual refresh triggered');
-    setWeeklyUsage(0);
-    setDailyUsage(0);
-    setTotalUsage(0);
-    setWeeklyData([]);
-    setContentData([]);
-    setTopContent([]);
-    setLastUpdated('');
-    setIsDataLoading(false);
-    
     loadDashboardData(true);
   };
 

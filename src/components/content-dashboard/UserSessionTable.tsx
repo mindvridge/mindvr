@@ -3,12 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { UserSession } from '@/types/auth';
 import { formatToKoreanTime, calculateDuration } from '@/lib/dateUtils';
+import { useToast } from '@/hooks/use-toast';
+import { Download } from 'lucide-react';
 
 export const UserSessionTable = () => {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchSessions();
@@ -73,6 +77,69 @@ export const UserSessionTable = () => {
     }
   };
 
+  const exportToExcel = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      
+      // Ensure admin session is set before export
+      const storedUser = localStorage.getItem('current_user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        if (userData.isAdmin) {
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+        }
+      }
+
+      // Fetch all session data for export
+      const { data, error } = await supabase
+        .rpc('get_user_sessions_with_usernames');
+
+      if (error) throw error;
+
+      const exportData = (data || []).map((session: any) => ({
+        '사용자': session.username,
+        '로그인시간': formatDateTime(session.login_time),
+        '로그아웃시간': session.logout_time ? formatDateTime(session.logout_time) : '진행중',
+        '세션시간': formatDuration(session.login_time, session.logout_time),
+        '상태': session.logout_time ? '종료됨' : '활성',
+        '생성일': formatDateTime(session.created_at),
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 15 }, // 사용자
+        { wch: 20 }, // 로그인시간
+        { wch: 20 }, // 로그아웃시간
+        { wch: 15 }, // 세션시간
+        { wch: 10 }, // 상태
+        { wch: 20 }, // 생성일
+      ];
+      worksheet['!cols'] = colWidths;
+      
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '사용자세션기록');
+
+      const fileName = `사용자세션기록_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      toast({
+        title: '성공',
+        description: `엑셀 파일이 다운로드되었습니다. (총 ${exportData.length}개 항목)`,
+      });
+    } catch (error) {
+      console.error('엑셀 내보내기 실패:', error);
+      toast({
+        title: '오류',
+        description: '엑셀 내보내기에 실패했습니다.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -89,7 +156,17 @@ export const UserSessionTable = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>사용자 세션 기록</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>사용자 세션 기록</CardTitle>
+          <Button
+            onClick={exportToExcel}
+            className="flex items-center gap-2"
+            variant="outline"
+          >
+            <Download className="h-4 w-4" />
+            엑셀 다운로드
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {sessions.length === 0 ? (
