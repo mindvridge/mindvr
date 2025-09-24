@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { UserSession } from '@/types/auth';
 import { formatToKoreanTime, calculateDuration } from '@/lib/dateUtils';
 import { useToast } from '@/hooks/use-toast';
-import { Download } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 
 export const UserSessionTable = () => {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -21,20 +21,33 @@ export const UserSessionTable = () => {
   const fetchSessions = async () => {
     setLoading(true);
     try {
-      // Ensure admin session is set before querying
+      // Set admin session first and wait for it to complete
       const storedUser = localStorage.getItem('current_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
-        if (userData.isAdmin) {
-          await supabase.rpc('set_admin_session', {
-            admin_id_value: userData.id
-          });
+        if (userData.isAdmin || userData.id) {
+          console.log('Setting admin session for user sessions:', userData.id);
+          try {
+            await supabase.rpc('set_admin_session', {
+              admin_id_value: userData.id
+            });
+            console.log('Admin session set successfully for user sessions');
+            // Wait a moment to ensure session is properly set
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (error) {
+            console.error('Failed to set admin session:', error);
+            throw error;
+          }
         }
       }
+
       const { data, error } = await supabase
         .rpc('get_user_sessions_with_usernames');
 
-      if (error) throw error;
+      if (error) {
+        console.error('RPC 호출 에러:', error);
+        throw error;
+      }
 
       // Transform data to match expected format
       const transformedData = data?.map((session: any) => ({
@@ -46,12 +59,27 @@ export const UserSessionTable = () => {
         users: { username: session.username }
       })) || [];
 
+      console.log('User sessions loaded:', transformedData.length, 'sessions');
       setSessions(transformedData);
+      
+      toast({
+        title: '성공',
+        description: `${transformedData.length}개의 세션을 불러왔습니다.`,
+      });
     } catch (error) {
       console.error('세션 조회 실패:', error);
+      toast({
+        title: '오류',
+        description: '세션 데이터를 불러오는데 실패했습니다.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchSessions();
   };
 
   const formatDateTime = (dateString: string) => {
@@ -85,10 +113,17 @@ export const UserSessionTable = () => {
       const storedUser = localStorage.getItem('current_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
-        if (userData.isAdmin) {
-          await supabase.rpc('set_admin_session', {
-            admin_id_value: userData.id
-          });
+        if (userData.isAdmin || userData.id) {
+          try {
+            await supabase.rpc('set_admin_session', {
+              admin_id_value: userData.id
+            });
+            // Wait a moment to ensure session is properly set
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (error) {
+            console.error('Failed to set admin session for export:', error);
+            throw error;
+          }
         }
       }
 
@@ -158,14 +193,25 @@ export const UserSessionTable = () => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>사용자 세션 기록</CardTitle>
-          <Button
-            onClick={exportToExcel}
-            className="flex items-center gap-2"
-            variant="outline"
-          >
-            <Download className="h-4 w-4" />
-            엑셀 다운로드
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleRefresh}
+              className="flex items-center gap-2"
+              variant="outline"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </Button>
+            <Button
+              onClick={exportToExcel}
+              className="flex items-center gap-2"
+              variant="outline"
+            >
+              <Download className="h-4 w-4" />
+              엑셀 다운로드
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
