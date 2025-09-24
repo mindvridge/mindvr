@@ -90,15 +90,23 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         setLoading(true);
       }
 
-      // Set admin session first
+      // Set admin session first and wait for it to complete
       const storedUser = localStorage.getItem('current_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         if (userData.isAdmin || userData.id) {
           console.log('Setting admin session:', userData.id);
-          await supabase.rpc('set_admin_session', {
-            admin_id_value: userData.id
-          });
+          try {
+            await supabase.rpc('set_admin_session', {
+              admin_id_value: userData.id
+            });
+            console.log('Admin session set successfully');
+            // Wait a moment to ensure session is properly set
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (error) {
+            console.error('Failed to set admin session:', error);
+            throw error; // Abort if admin session cannot be set
+          }
         }
       }
 
@@ -127,61 +135,49 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const dayStartUTC = new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
       const dayEndUTC = new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
 
-      // Execute basic queries with better error handling
+      // Execute all basic queries in parallel with proper error handling
       console.log('Fetching basic stats...');
       
-      let weeklyLoginCount = 0;
-      let dailyLoginCount = 0; 
-      let totalLoginCount = 0;
-
-      try {
-        const weeklyResult = await supabase
-          .from('user_sessions')
-          .select('id')
-          .gte('login_time', weekStartUTC.toISOString())
-          .lte('login_time', weekEndUTC.toISOString());
-        
-        if (!weeklyResult.error && weeklyResult.data) {
-          weeklyLoginCount = weeklyResult.data.length;
-          console.log('Weekly login count loaded:', weeklyLoginCount);
-        } else {
-          console.error('Weekly data error:', weeklyResult.error);
+      const executeQuery = async (queryBuilder: any, queryName: string) => {
+        try {
+          const result = await queryBuilder;
+          if (!result.error && result.data) {
+            console.log(`${queryName} login count loaded:`, result.data.length);
+            return result.data.length;
+          } else {
+            console.error(`${queryName} data error:`, result.error);
+            return 0;
+          }
+        } catch (error) {
+          console.error(`${queryName} data fetch failed:`, error);
+          return 0;
         }
-      } catch (error) {
-        console.error('Weekly data fetch failed:', error);
-      }
+      };
 
-      try {
-        const dailyResult = await supabase
-          .from('user_sessions')
-          .select('id')
-          .gte('login_time', dayStartUTC.toISOString())
-          .lte('login_time', dayEndUTC.toISOString());
-        
-        if (!dailyResult.error && dailyResult.data) {
-          dailyLoginCount = dailyResult.data.length;
-          console.log('Daily login count loaded:', dailyLoginCount);
-        } else {
-          console.error('Daily data error:', dailyResult.error);
-        }
-      } catch (error) {
-        console.error('Daily data fetch failed:', error);
-      }
-
-      try {
-        const totalResult = await supabase
-          .from('user_sessions')
-          .select('id');
-        
-        if (!totalResult.error && totalResult.data) {
-          totalLoginCount = totalResult.data.length;
-          console.log('Total login count loaded:', totalLoginCount);
-        } else {
-          console.error('Total data error:', totalResult.error);
-        }
-      } catch (error) {
-        console.error('Total data fetch failed:', error);
-      }
+      const [weeklyLoginCount, dailyLoginCount, totalLoginCount] = await Promise.all([
+        executeQuery(
+          supabase
+            .from('user_sessions')
+            .select('id')
+            .gte('login_time', weekStartUTC.toISOString())
+            .lte('login_time', weekEndUTC.toISOString()),
+          'Weekly'
+        ),
+        executeQuery(
+          supabase
+            .from('user_sessions')
+            .select('id')
+            .gte('login_time', dayStartUTC.toISOString())
+            .lte('login_time', dayEndUTC.toISOString()),
+          'Daily'
+        ),
+        executeQuery(
+          supabase
+            .from('user_sessions')
+            .select('id'),
+          'Total'
+        )
+      ]);
       
       // Update states atomically
       setWeeklyUsage(weeklyLoginCount);
