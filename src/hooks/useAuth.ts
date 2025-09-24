@@ -46,10 +46,24 @@ export const useAuth = () => {
       document.addEventListener(event, resetInactivityTimer);
     });
 
-    // Handle page unload
-    const handleBeforeUnload = () => {
+    // Handle network disconnection
+    const handleOnline = () => {
+      console.log('Network connection restored');
+    };
+
+    const handleOffline = () => {
+      console.log('Network connection lost - session will be logged out when reconnected');
+      // Store the disconnect time for when we come back online
+      localStorage.setItem('last_disconnect_time', new Date().toISOString());
+    };
+
+    // Handle page unload/refresh
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (currentSessionId && user) {
-        // Use synchronous request for page unload
+        // Update session logout time immediately
+        updateSessionLogoutTime();
+        
+        // Use synchronous request for page unload as backup
         try {
           fetch(`https://ewyqozozuluyfnemgsuw.supabase.co/rest/v1/user_sessions?id=eq.${currentSessionId}`, {
             method: 'PATCH',
@@ -72,17 +86,89 @@ export const useAuth = () => {
     // Handle visibility change (tab switch, minimize, etc.)
     const handleVisibilityChange = () => {
       if (document.hidden && currentSessionId && user) {
+        // Store when tab became hidden
+        localStorage.setItem('tab_hidden_time', new Date().toISOString());
+        
         // Wait a bit to see if user comes back
         setTimeout(() => {
           if (document.hidden && currentSessionId && user) {
             autoLogout('tab_hidden');
           }
-        }, 5000); // 5 seconds delay
+        }, 10000); // 10 seconds delay
+      } else if (!document.hidden && currentSessionId && user) {
+        // Tab became visible again
+        const hiddenTime = localStorage.getItem('tab_hidden_time');
+        if (hiddenTime) {
+          const hiddenDuration = Date.now() - new Date(hiddenTime).getTime();
+          // If tab was hidden for more than 5 minutes, logout
+          if (hiddenDuration > 5 * 60 * 1000) {
+            autoLogout('long_tab_hidden');
+          }
+          localStorage.removeItem('tab_hidden_time');
+        }
       }
     };
 
+    // Handle browser focus/blur
+    const handleWindowBlur = () => {
+      if (currentSessionId && user) {
+        localStorage.setItem('window_blur_time', new Date().toISOString());
+      }
+    };
+
+    const handleWindowFocus = () => {
+      if (currentSessionId && user) {
+        const blurTime = localStorage.getItem('window_blur_time');
+        if (blurTime) {
+          const blurDuration = Date.now() - new Date(blurTime).getTime();
+          // If window was out of focus for more than 10 minutes, logout
+          if (blurDuration > 10 * 60 * 1000) {
+            autoLogout('long_window_blur');
+          }
+          localStorage.removeItem('window_blur_time');
+        }
+      }
+    };
+
+    // Periodic session validation
+    const validateSession = async () => {
+      if (currentSessionId && user) {
+        try {
+          // Check if session still exists and is valid
+          const { data, error } = await supabase
+            .from('user_sessions')
+            .select('logout_time')
+            .eq('id', currentSessionId)
+            .single();
+
+          if (error || !data) {
+            console.log('Session no longer exists, logging out');
+            autoLogout('session_invalid');
+            return;
+          }
+
+          // If session has logout_time set, means it was logged out elsewhere
+          if (data.logout_time) {
+            console.log('Session was logged out elsewhere');
+            autoLogout('logged_out_elsewhere');
+            return;
+          }
+        } catch (error) {
+          console.error('Session validation failed:', error);
+        }
+      }
+    };
+
+    // Set up event listeners
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Validate session every 2 minutes
+    const sessionValidationInterval = setInterval(validateSession, 2 * 60 * 1000);
 
     // Initial timer setup
     resetInactivityTimer();
@@ -92,12 +178,32 @@ export const useAuth = () => {
       activityEvents.forEach(event => {
         document.removeEventListener(event, resetInactivityTimer);
       });
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(sessionValidationInterval);
       if (inactivityTimer) {
         clearTimeout(inactivityTimer);
       }
     };
+  };
+
+  // Helper function to update session logout time
+  const updateSessionLogoutTime = async () => {
+    if (currentSessionId) {
+      try {
+        await supabase
+          .from('user_sessions')
+          .update({ logout_time: new Date().toISOString() })
+          .eq('id', currentSessionId);
+        console.log('Session logout time updated');
+      } catch (error) {
+        console.error('Failed to update session logout time:', error);
+      }
+    }
   };
 
   const autoLogout = async (reason: string) => {
