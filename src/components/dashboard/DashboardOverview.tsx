@@ -90,23 +90,18 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         setLoading(true);
       }
 
-      // Set admin session first and wait for it to complete
+      // 관리자 세션 설정 및 충분한 대기 시간 확보
       const storedUser = localStorage.getItem('current_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         if (userData.isAdmin || userData.id) {
           console.log('Setting admin session:', userData.id);
-          try {
-            await supabase.rpc('set_admin_session', {
-              admin_id_value: userData.id
-            });
-            console.log('Admin session set successfully');
-            // Wait a moment to ensure session is properly set
-            await new Promise(resolve => setTimeout(resolve, 100));
-          } catch (error) {
-            console.error('Failed to set admin session:', error);
-            throw error; // Abort if admin session cannot be set
-          }
+          await supabase.rpc('set_admin_session', {
+            admin_id_value: userData.id
+          });
+          console.log('Admin session set successfully');
+          // 세션이 완전히 설정될 때까지 충분히 기다림
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
 
@@ -120,7 +115,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       console.log('Week range:', weekStartUTC.toISOString(), 'to', weekEndUTC.toISOString());
 
-      // Calculate daily dates for parallel requests
+      // Calculate daily dates
       const today = new Date(now);
       let targetDate = today;
       if (today < weekStart || today > weekEnd) {
@@ -135,62 +130,33 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const dayStartUTC = new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
       const dayEndUTC = new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
 
-      // Execute all basic queries in parallel with proper error handling
-      console.log('Fetching basic stats...');
+      // 모든 쿼리를 하나의 Promise.all로 통합하여 원자적 실행
+      console.log('Fetching all dashboard data...');
       
-      const executeQuery = async (queryBuilder: any, queryName: string) => {
-        try {
-          const result = await queryBuilder;
-          if (!result.error && result.data) {
-            console.log(`${queryName} login count loaded:`, result.data.length);
-            return result.data.length;
-          } else {
-            console.error(`${queryName} data error:`, result.error);
-            return 0;
-          }
-        } catch (error) {
-          console.error(`${queryName} data fetch failed:`, error);
-          return 0;
-        }
-      };
-
-      const [weeklyLoginCount, dailyLoginCount, totalLoginCount] = await Promise.all([
-        executeQuery(
-          supabase
-            .from('user_sessions')
-            .select('id')
-            .gte('login_time', weekStartUTC.toISOString())
-            .lte('login_time', weekEndUTC.toISOString()),
-          'Weekly'
-        ),
-        executeQuery(
-          supabase
-            .from('user_sessions')
-            .select('id')
-            .gte('login_time', dayStartUTC.toISOString())
-            .lte('login_time', dayEndUTC.toISOString()),
-          'Daily'
-        ),
-        executeQuery(
-          supabase
-            .from('user_sessions')
-            .select('id'),
-          'Total'
-        )
-      ]);
-      
-      // Update states atomically
-      setWeeklyUsage(weeklyLoginCount);
-      setDailyUsage(dailyLoginCount);
-      setTotalUsage(totalLoginCount);
-
-      // Execute remaining queries in parallel
       const [
-        weeklyChartDataResult,
+        weeklyLoginResult,
+        dailyLoginResult,
+        totalLoginResult,
+        dailyChartData,
         contentLogsResult,
         topContentLogsResult
-      ] = await Promise.allSettled([
-        // Generate weekly chart data in parallel
+      ] = await Promise.all([
+        // 기본 통계
+        supabase
+          .from('user_sessions')
+          .select('id')
+          .gte('login_time', weekStartUTC.toISOString())
+          .lte('login_time', weekEndUTC.toISOString()),
+        supabase
+          .from('user_sessions')
+          .select('id')
+          .gte('login_time', dayStartUTC.toISOString())
+          .lte('login_time', dayEndUTC.toISOString()),
+        supabase
+          .from('user_sessions')
+          .select('id'),
+        
+        // 주간 차트 데이터
         Promise.all(Array.from({ length: 7 }, (_, i) => {
           const date = new Date(weekStart);
           date.setDate(weekStart.getDate() + i);
@@ -208,13 +174,13 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
             .select('id')
             .gte('login_time', startUTC.toISOString())
             .lte('login_time', endUTC.toISOString())
-            .then(({ data }) => ({
+            .then(({ data, error }) => ({
               date: `${date.getMonth() + 1}/${date.getDate()}`,
-              count: data?.length || 0
+              count: error ? 0 : (data?.length || 0)
             }));
         })),
         
-        // Get content usage data for selected week
+        // 콘텐츠 사용 데이터
         supabase
           .from('vr_usage_logs')
           .select('content_name')
@@ -222,7 +188,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           .gte('start_time', weekStartUTC.toISOString())
           .lte('start_time', weekEndUTC.toISOString()),
         
-        // Get TOP3 content for selected week
+        // TOP3 콘텐츠 데이터
         supabase
           .from('vr_usage_logs')
           .select('content_name, duration_minutes, start_time')
@@ -231,28 +197,24 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           .lte('start_time', weekEndUTC.toISOString())
       ]);
 
-      // Process weekly chart data
-      const weeklyChartData = weeklyChartDataResult.status === 'fulfilled' 
-        ? weeklyChartDataResult.value 
-        : Array.from({ length: 7 }, (_, i) => {
-            const date = new Date(weekStart);
-            date.setDate(weekStart.getDate() + i);
-            return {
-              date: `${date.getMonth() + 1}/${date.getDate()}`,
-              count: 0
-            };
-          });
-      
-      console.log('Weekly chart data:', weeklyChartData);
-      setWeeklyData(weeklyChartData);
+      // 모든 결과를 한 번에 처리
+      const weeklyLoginCount = weeklyLoginResult.error ? 0 : (weeklyLoginResult.data?.length || 0);
+      const dailyLoginCount = dailyLoginResult.error ? 0 : (dailyLoginResult.data?.length || 0);
+      const totalLoginCount = totalLoginResult.error ? 0 : (totalLoginResult.data?.length || 0);
+
+      console.log('Login counts:', { weeklyLoginCount, dailyLoginCount, totalLoginCount });
+
+      // 상태를 원자적으로 업데이트
+      setWeeklyUsage(weeklyLoginCount);
+      setDailyUsage(dailyLoginCount);
+      setTotalUsage(totalLoginCount);
+      setWeeklyData(dailyChartData);
 
       // Process content data
-      const contentLogs = contentLogsResult.status === 'fulfilled' && !contentLogsResult.value.error
-        ? contentLogsResult.value.data || []
-        : [];
+      const contentLogs = contentLogsResult.error ? [] : (contentLogsResult.data || []);
       
-      if (contentLogsResult.status === 'rejected' || (contentLogsResult.status === 'fulfilled' && contentLogsResult.value.error)) {
-        console.error('Content data error:', contentLogsResult.status === 'rejected' ? contentLogsResult.reason : contentLogsResult.value.error);
+      if (contentLogsResult.error) {
+        console.error('Content data error:', contentLogsResult.error);
       }
 
       const contentCounts = contentLogs.reduce((acc: any, log: any) => {
@@ -276,12 +238,10 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setContentData(contentChartData);
 
       // Process TOP3 content data
-      const weeklyContentLogs = topContentLogsResult.status === 'fulfilled' && !topContentLogsResult.value.error
-        ? topContentLogsResult.value.data || []
-        : [];
+      const weeklyContentLogs = topContentLogsResult.error ? [] : (topContentLogsResult.data || []);
 
-      if (topContentLogsResult.status === 'rejected' || (topContentLogsResult.status === 'fulfilled' && topContentLogsResult.value.error)) {
-        console.error('Top content data error:', topContentLogsResult.status === 'rejected' ? topContentLogsResult.reason : topContentLogsResult.value.error);
+      if (topContentLogsResult.error) {
+        console.error('Top content data error:', topContentLogsResult.error);
       }
 
       const weeklyContentStats = weeklyContentLogs.reduce((acc: any, log: any) => {
@@ -480,73 +440,48 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         {/* Weekly Usage Line Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>일별 이용 횟수 (선택된 주)</CardTitle>
+            <CardTitle className="text-lg font-semibold">일별 이용 현황</CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={{
-                count: {
-                  label: "이용 횟수",
-                  color: "hsl(260 80% 60%)",
-                },
-              }}
-              className="h-[250px]"
-            >
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weeklyData}>
+                <LineChart data={weeklyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Tooltip />
                   <Line 
                     type="monotone" 
                     dataKey="count" 
-                    stroke="hsl(260 80% 60%)" 
-                    strokeWidth={3}
-                    dot={{ fill: "hsl(260 80% 60%)", strokeWidth: 2 }}
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={{ fill: "hsl(var(--primary))" }}
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </ChartContainer>
+            </div>
           </CardContent>
         </Card>
 
         {/* Content Usage Bar Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>콘텐츠별 재생 횟수 (선택된 주)</CardTitle>
+            <CardTitle className="text-lg font-semibold">콘텐츠별 재생 횟수</CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={{
-                count: {
-                  label: "재생 횟수",
-                  color: "hsl(260 80% 60%)",
-                },
-              }}
-              className="h-[250px]"
-            >
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={contentData}>
+                <BarChart data={contentData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" fill="hsl(260 80% 60%)" radius={[4, 4, 0, 0]}>
-                    <LabelList 
-                      dataKey="count" 
-                      position="top" 
-                      style={{ 
-                        fill: "hsl(var(--foreground))", 
-                        fontSize: "12px", 
-                        fontWeight: "500" 
-                      }}
-                      formatter={(value: number) => value > 0 ? value : ""}
-                    />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="hsl(var(--primary))">
+                    <LabelList dataKey="count" position="top" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </ChartContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -554,45 +489,52 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       {/* Top Content Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
-            콘텐츠 TOP3 (선택된 주)
-          </CardTitle>
+          <CardTitle className="text-lg font-semibold">TOP3 콘텐츠 ({formatWeek(selectedWeek)})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-16">순위</TableHead>
-                <TableHead>콘텐츠 번호</TableHead>
-                <TableHead>콘텐츠 제목</TableHead>
+                <TableHead>콘텐츠명</TableHead>
                 <TableHead>재생 횟수</TableHead>
-                <TableHead>평균 사용 시간</TableHead>
+                <TableHead>평균 이용시간</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topContent.map((content) => (
-                <TableRow key={content.rank}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={content.rank === 1 ? "default" : "secondary"}>
-                        {content.rank}
-                      </Badge>
-                      {content.rank <= 3 && (
-                        <Trophy className={`h-4 w-4 ${
-                          content.rank === 1 ? 'text-yellow-500' : 
-                          content.rank === 2 ? 'text-gray-400' : 
-                          'text-amber-600'
-                        }`} />
-                      )}
-                    </div>
+              {topContent.length > 0 ? (
+                topContent.map((content) => (
+                  <TableRow key={content.rank}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {content.rank === 1 && <Trophy className="h-4 w-4 text-yellow-500" />}
+                        {content.rank === 2 && <Trophy className="h-4 w-4 text-gray-400" />}
+                        {content.rank === 3 && <Trophy className="h-4 w-4 text-yellow-600" />}
+                        <span className="font-medium">{content.rank}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span>{content.contentName}</span>
+                        <Badge variant="secondary">v{content.contentVersion}</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>{content.playCount}회</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{content.avgTime}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    선택한 주간에 대한 콘텐츠 사용 데이터가 없습니다.
                   </TableCell>
-                  <TableCell>{content.contentVersion}</TableCell>
-                  <TableCell className="font-medium">{content.contentName}</TableCell>
-                  <TableCell>{content.playCount}</TableCell>
-                  <TableCell className="text-primary">{content.avgTime}</TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>
