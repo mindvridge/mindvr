@@ -112,22 +112,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       console.log('Week range:', weekStartUTC.toISOString(), 'to', weekEndUTC.toISOString());
 
-      // Get weekly usage count
-      const { data: weeklyLogins, error: weeklyError } = await supabase
-        .from('user_sessions')
-        .select('id')
-        .gte('login_time', weekStartUTC.toISOString())
-        .lte('login_time', weekEndUTC.toISOString());
-
-      if (weeklyError) {
-        console.error('Weekly data error:', weeklyError);
-      }
-      
-      const weeklyLoginCount = weeklyLogins?.length || 0;
-      console.log('Weekly login count:', weeklyLoginCount);
-      setWeeklyUsage(weeklyLoginCount);
-      
-      // Get daily usage count (current day or selected week's first day)
+      // Calculate daily dates for parallel requests
       const today = new Date(now);
       let targetDate = today;
       if (today < weekStart || today > weekEnd) {
@@ -141,79 +126,137 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       const dayStartUTC = new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
       const dayEndUTC = new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
-      
-      const { data: todayLogins, error: dailyError } = await supabase
-        .from('user_sessions')
-        .select('id')
-        .gte('login_time', dayStartUTC.toISOString())
-        .lte('login_time', dayEndUTC.toISOString());
 
-      if (dailyError) {
-        console.error('Daily data error:', dailyError);
-      }
-      
-      const dailyLoginCount = todayLogins?.length || 0;
-      console.log('Daily login count:', dailyLoginCount);
-      setDailyUsage(dailyLoginCount);
-
-      // Get total usage count
-      const { data: totalLogins, error: totalError } = await supabase
-        .from('user_sessions')
-        .select('id');
-
-      if (totalError) {
-        console.error('Total data error:', totalError);
-      }
-      
-      const totalLoginCount = totalLogins?.length || 0;
-      console.log('Total login count:', totalLoginCount);
-      setTotalUsage(totalLoginCount);
-
-      // Generate weekly chart data
-      const weekDates = [];
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + i);
-        weekDates.push(date);
-      }
-
-      const weeklyChartData = await Promise.all(weekDates.map(async (date) => {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const startUTC = new Date(startOfDay.getTime() - (9 * 60 * 60 * 1000));
-        const endUTC = new Date(endOfDay.getTime() - (9 * 60 * 60 * 1000));
-
-        const { data: dayLogins } = await supabase
+      // Execute all basic queries in parallel to avoid race conditions
+      const [
+        weeklyLoginsResult,
+        dailyLoginsResult,
+        totalLoginsResult
+      ] = await Promise.allSettled([
+        supabase
           .from('user_sessions')
           .select('id')
-          .gte('login_time', startUTC.toISOString())
-          .lte('login_time', endUTC.toISOString());
+          .gte('login_time', weekStartUTC.toISOString())
+          .lte('login_time', weekEndUTC.toISOString()),
+        
+        supabase
+          .from('user_sessions')
+          .select('id')
+          .gte('login_time', dayStartUTC.toISOString())
+          .lte('login_time', dayEndUTC.toISOString()),
+        
+        supabase
+          .from('user_sessions')
+          .select('id')
+      ]);
 
-        return {
-          date: `${date.getMonth() + 1}/${date.getDate()}`,
-          count: dayLogins?.length || 0
-        };
-      }));
+      // Process results safely
+      const weeklyLoginCount = weeklyLoginsResult.status === 'fulfilled' && !weeklyLoginsResult.value.error 
+        ? weeklyLoginsResult.value.data?.length || 0 
+        : 0;
+      
+      const dailyLoginCount = dailyLoginsResult.status === 'fulfilled' && !dailyLoginsResult.value.error 
+        ? dailyLoginsResult.value.data?.length || 0 
+        : 0;
+      
+      const totalLoginCount = totalLoginsResult.status === 'fulfilled' && !totalLoginsResult.value.error 
+        ? totalLoginsResult.value.data?.length || 0 
+        : 0;
+
+      // Log errors if any occurred
+      if (weeklyLoginsResult.status === 'rejected' || (weeklyLoginsResult.status === 'fulfilled' && weeklyLoginsResult.value.error)) {
+        console.error('Weekly data error:', weeklyLoginsResult.status === 'rejected' ? weeklyLoginsResult.reason : weeklyLoginsResult.value.error);
+      }
+      
+      if (dailyLoginsResult.status === 'rejected' || (dailyLoginsResult.status === 'fulfilled' && dailyLoginsResult.value.error)) {
+        console.error('Daily data error:', dailyLoginsResult.status === 'rejected' ? dailyLoginsResult.reason : dailyLoginsResult.value.error);
+      }
+      
+      if (totalLoginsResult.status === 'rejected' || (totalLoginsResult.status === 'fulfilled' && totalLoginsResult.value.error)) {
+        console.error('Total data error:', totalLoginsResult.status === 'rejected' ? totalLoginsResult.reason : totalLoginsResult.value.error);
+      }
+
+      console.log('Weekly login count:', weeklyLoginCount);
+      console.log('Daily login count:', dailyLoginCount);
+      console.log('Total login count:', totalLoginCount);
+      
+      // Set all core values at once to prevent partial updates
+      setWeeklyUsage(weeklyLoginCount);
+      setDailyUsage(dailyLoginCount);
+      setTotalUsage(totalLoginCount);
+
+      // Execute remaining queries in parallel
+      const [
+        weeklyChartDataResult,
+        contentLogsResult,
+        topContentLogsResult
+      ] = await Promise.allSettled([
+        // Generate weekly chart data in parallel
+        Promise.all(Array.from({ length: 7 }, (_, i) => {
+          const date = new Date(weekStart);
+          date.setDate(weekStart.getDate() + i);
+          
+          const startOfDay = new Date(date);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(date);
+          endOfDay.setHours(23, 59, 59, 999);
+
+          const startUTC = new Date(startOfDay.getTime() - (9 * 60 * 60 * 1000));
+          const endUTC = new Date(endOfDay.getTime() - (9 * 60 * 60 * 1000));
+
+          return supabase
+            .from('user_sessions')
+            .select('id')
+            .gte('login_time', startUTC.toISOString())
+            .lte('login_time', endUTC.toISOString())
+            .then(({ data }) => ({
+              date: `${date.getMonth() + 1}/${date.getDate()}`,
+              count: data?.length || 0
+            }));
+        })),
+        
+        // Get content usage data for selected week
+        supabase
+          .from('vr_usage_logs')
+          .select('content_name')
+          .not('content_name', 'is', null)
+          .gte('start_time', weekStartUTC.toISOString())
+          .lte('start_time', weekEndUTC.toISOString()),
+        
+        // Get TOP3 content for selected week
+        supabase
+          .from('vr_usage_logs')
+          .select('content_name, duration_minutes, start_time')
+          .not('content_name', 'is', null)
+          .gte('start_time', weekStartUTC.toISOString())
+          .lte('start_time', weekEndUTC.toISOString())
+      ]);
+
+      // Process weekly chart data
+      const weeklyChartData = weeklyChartDataResult.status === 'fulfilled' 
+        ? weeklyChartDataResult.value 
+        : Array.from({ length: 7 }, (_, i) => {
+            const date = new Date(weekStart);
+            date.setDate(weekStart.getDate() + i);
+            return {
+              date: `${date.getMonth() + 1}/${date.getDate()}`,
+              count: 0
+            };
+          });
       
       console.log('Weekly chart data:', weeklyChartData);
       setWeeklyData(weeklyChartData);
 
-      // Get content usage data for selected week
-      const { data: contentLogs, error: contentError } = await supabase
-        .from('vr_usage_logs')
-        .select('content_name')
-        .not('content_name', 'is', null)
-        .gte('start_time', weekStartUTC.toISOString())
-        .lte('start_time', weekEndUTC.toISOString());
-
-      if (contentError) {
-        console.error('Content data error:', contentError);
+      // Process content data
+      const contentLogs = contentLogsResult.status === 'fulfilled' && !contentLogsResult.value.error
+        ? contentLogsResult.value.data || []
+        : [];
+      
+      if (contentLogsResult.status === 'rejected' || (contentLogsResult.status === 'fulfilled' && contentLogsResult.value.error)) {
+        console.error('Content data error:', contentLogsResult.status === 'rejected' ? contentLogsResult.reason : contentLogsResult.value.error);
       }
 
-      const contentCounts = (contentLogs || []).reduce((acc: any, log: any) => {
+      const contentCounts = contentLogs.reduce((acc: any, log: any) => {
         const contentName = log.content_name?.toString();
         if (contentName) {
           acc[contentName] = (acc[contentName] || 0) + 1;
@@ -233,19 +276,16 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       console.log('Content chart data:', contentChartData);
       setContentData(contentChartData);
 
-      // Get TOP3 content for selected week
-      const { data: weeklyContentLogs, error: topContentError } = await supabase
-        .from('vr_usage_logs')
-        .select('content_name, duration_minutes, start_time')
-        .not('content_name', 'is', null)
-        .gte('start_time', weekStartUTC.toISOString())
-        .lte('start_time', weekEndUTC.toISOString());
+      // Process TOP3 content data
+      const weeklyContentLogs = topContentLogsResult.status === 'fulfilled' && !topContentLogsResult.value.error
+        ? topContentLogsResult.value.data || []
+        : [];
 
-      if (topContentError) {
-        console.error('Top content data error:', topContentError);
+      if (topContentLogsResult.status === 'rejected' || (topContentLogsResult.status === 'fulfilled' && topContentLogsResult.value.error)) {
+        console.error('Top content data error:', topContentLogsResult.status === 'rejected' ? topContentLogsResult.reason : topContentLogsResult.value.error);
       }
 
-      const weeklyContentStats = (weeklyContentLogs || []).reduce((acc: any, log: any) => {
+      const weeklyContentStats = weeklyContentLogs.reduce((acc: any, log: any) => {
         const contentName = log.content_name.toString();
         if (!acc[contentName]) {
           acc[contentName] = { playCount: 0, totalDuration: 0, durationsCount: 0 };
