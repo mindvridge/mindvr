@@ -244,18 +244,24 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         console.error('Top content data error:', topContentLogsResult.error);
       }
 
+      console.log('Raw weekly content logs:', weeklyContentLogs);
+
       const weeklyContentStats = weeklyContentLogs.reduce((acc: any, log: any) => {
-        const contentName = log.content_name.toString();
-        if (!acc[contentName]) {
-          acc[contentName] = { playCount: 0, totalDuration: 0, durationsCount: 0 };
-        }
-        acc[contentName].playCount += 1;
-        if (log.duration_minutes) {
-          acc[contentName].totalDuration += log.duration_minutes;
-          acc[contentName].durationsCount += 1;
+        const contentName = log.content_name?.toString();
+        if (contentName) {
+          if (!acc[contentName]) {
+            acc[contentName] = { playCount: 0, totalDuration: 0, durationsCount: 0 };
+          }
+          acc[contentName].playCount += 1;
+          if (log.duration_minutes) {
+            acc[contentName].totalDuration += log.duration_minutes;
+            acc[contentName].durationsCount += 1;
+          }
         }
         return acc;
       }, {});
+
+      console.log('Weekly content stats:', weeklyContentStats);
 
       const weeklyTopContent = Object.entries(weeklyContentStats)
         .map(([contentName, stats]: [string, any]) => ({
