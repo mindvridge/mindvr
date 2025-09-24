@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -28,6 +28,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isLoadingRef = useRef(false);
   
   const { toast } = useToast();
 
@@ -72,8 +74,23 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     return `${startStr} ~ ${endStr}`;
   };
 
-  const loadDashboardData = async (isRefresh = false) => {
+  const loadDashboardData = useCallback(async (isRefresh = false) => {
+    // 이미 로딩 중이면 중단
+    if (isLoadingRef.current && !isRefresh) {
+      return;
+    }
+
+    // 이전 요청 취소
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // 새로운 AbortController 생성
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     console.log('Loading dashboard data...', { isRefresh, selectedWeek });
+    isLoadingRef.current = true;
 
     try {
       if (isRefresh) {
@@ -81,6 +98,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       } else {
         setLoading(true);
       }
+
+      // 요청이 취소되었으면 중단
+      if (signal.aborted) return;
 
       // Set admin session
       const storedUser = localStorage.getItem('current_user');
@@ -92,6 +112,9 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           });
         }
       }
+
+      // 요청이 취소되었으면 중단
+      if (signal.aborted) return;
 
       const now = getCurrentKoreanTime();
       
@@ -107,7 +130,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         .from('user_sessions')
         .select('id')
         .gte('login_time', weekStartUTC.toISOString())
-        .lte('login_time', weekEndUTC.toISOString());
+        .lte('login_time', weekEndUTC.toISOString())
+        .abortSignal(signal);
       
       const weeklyLoginCount = weeklyLogins?.length || 0;
       setWeeklyUsage(weeklyLoginCount);
@@ -131,7 +155,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         .from('user_sessions')
         .select('id')
         .gte('login_time', dayStartUTC.toISOString())
-        .lte('login_time', dayEndUTC.toISOString());
+        .lte('login_time', dayEndUTC.toISOString())
+        .abortSignal(signal);
       
       const dailyLoginCount = todayLogins?.length || 0;
       setDailyUsage(dailyLoginCount);
@@ -139,7 +164,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       // Get total usage count
       const { data: totalLogins } = await supabase
         .from('user_sessions')
-        .select('id');
+        .select('id')
+        .abortSignal(signal);
       
       const totalLoginCount = totalLogins?.length || 0;
       setTotalUsage(totalLoginCount);
@@ -165,7 +191,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           .from('user_sessions')
           .select('id')
           .gte('login_time', startUTC.toISOString())
-          .lte('login_time', endUTC.toISOString());
+          .lte('login_time', endUTC.toISOString())
+          .abortSignal(signal);
 
         return {
           date: `${date.getMonth() + 1}/${date.getDate()}`,
@@ -181,7 +208,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         .select('content_name')
         .not('content_name', 'is', null)
         .gte('start_time', weekStartUTC.toISOString())
-        .lte('start_time', weekEndUTC.toISOString());
+        .lte('start_time', weekEndUTC.toISOString())
+        .abortSignal(signal);
 
       const contentCounts = (contentLogs || []).reduce((acc: any, log: any) => {
         const contentName = log.content_name?.toString();
@@ -208,7 +236,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         .select('content_name, duration_minutes, start_time')
         .not('content_name', 'is', null)
         .gte('start_time', weekStartUTC.toISOString())
-        .lte('start_time', weekEndUTC.toISOString());
+        .lte('start_time', weekEndUTC.toISOString())
+        .abortSignal(signal);
 
       const weeklyContentStats = (weeklyContentLogs || []).reduce((acc: any, log: any) => {
         const contentName = log.content_name.toString();
@@ -256,7 +285,12 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         });
       }
 
-    } catch (error) {
+    } catch (error: any) {
+      // AbortError는 정상적인 취소이므로 무시
+      if (error.name === 'AbortError' || signal.aborted) {
+        return;
+      }
+      
       console.error('Dashboard data loading failed:', error);
       
       setWeeklyUsage(0);
@@ -272,25 +306,29 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         variant: "destructive",
       });
     } finally {
+      isLoadingRef.current = false;
       setLoading(false);
       setRefreshing(false);
+      abortControllerRef.current = null;
     }
-  };
+  }, [selectedWeek, toast]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     console.log('Manual refresh triggered');
     loadDashboardData(true);
-  };
+  }, [loadDashboardData]);
 
   useEffect(() => {
-    console.log('Initial load');
+    console.log('Dashboard data load triggered', { selectedWeek });
     loadDashboardData();
-  }, []);
-
-  useEffect(() => {
-    console.log('Selected week changed:', selectedWeek);
-    loadDashboardData();
-  }, [selectedWeek]);
+    
+    // Cleanup function to abort any pending requests
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [loadDashboardData]);
 
   const today = new Date().toISOString().split('T')[0];
 
