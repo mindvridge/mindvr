@@ -127,60 +127,63 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const dayStartUTC = new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
       const dayEndUTC = new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
 
-      // Execute all basic queries in parallel to avoid race conditions
-      const [
-        weeklyLoginsResult,
-        dailyLoginsResult,
-        totalLoginsResult
-      ] = await Promise.allSettled([
-        supabase
+      // Execute basic queries with better error handling
+      console.log('Fetching basic stats...');
+      
+      let weeklyLoginCount = 0;
+      let dailyLoginCount = 0; 
+      let totalLoginCount = 0;
+
+      try {
+        const weeklyResult = await supabase
           .from('user_sessions')
           .select('id')
           .gte('login_time', weekStartUTC.toISOString())
-          .lte('login_time', weekEndUTC.toISOString()),
+          .lte('login_time', weekEndUTC.toISOString());
         
-        supabase
+        if (!weeklyResult.error && weeklyResult.data) {
+          weeklyLoginCount = weeklyResult.data.length;
+          console.log('Weekly login count loaded:', weeklyLoginCount);
+        } else {
+          console.error('Weekly data error:', weeklyResult.error);
+        }
+      } catch (error) {
+        console.error('Weekly data fetch failed:', error);
+      }
+
+      try {
+        const dailyResult = await supabase
           .from('user_sessions')
           .select('id')
           .gte('login_time', dayStartUTC.toISOString())
-          .lte('login_time', dayEndUTC.toISOString()),
+          .lte('login_time', dayEndUTC.toISOString());
         
-        supabase
+        if (!dailyResult.error && dailyResult.data) {
+          dailyLoginCount = dailyResult.data.length;
+          console.log('Daily login count loaded:', dailyLoginCount);
+        } else {
+          console.error('Daily data error:', dailyResult.error);
+        }
+      } catch (error) {
+        console.error('Daily data fetch failed:', error);
+      }
+
+      try {
+        const totalResult = await supabase
           .from('user_sessions')
-          .select('id')
-      ]);
-
-      // Process results safely
-      const weeklyLoginCount = weeklyLoginsResult.status === 'fulfilled' && !weeklyLoginsResult.value.error 
-        ? weeklyLoginsResult.value.data?.length || 0 
-        : 0;
-      
-      const dailyLoginCount = dailyLoginsResult.status === 'fulfilled' && !dailyLoginsResult.value.error 
-        ? dailyLoginsResult.value.data?.length || 0 
-        : 0;
-      
-      const totalLoginCount = totalLoginsResult.status === 'fulfilled' && !totalLoginsResult.value.error 
-        ? totalLoginsResult.value.data?.length || 0 
-        : 0;
-
-      // Log errors if any occurred
-      if (weeklyLoginsResult.status === 'rejected' || (weeklyLoginsResult.status === 'fulfilled' && weeklyLoginsResult.value.error)) {
-        console.error('Weekly data error:', weeklyLoginsResult.status === 'rejected' ? weeklyLoginsResult.reason : weeklyLoginsResult.value.error);
+          .select('id');
+        
+        if (!totalResult.error && totalResult.data) {
+          totalLoginCount = totalResult.data.length;
+          console.log('Total login count loaded:', totalLoginCount);
+        } else {
+          console.error('Total data error:', totalResult.error);
+        }
+      } catch (error) {
+        console.error('Total data fetch failed:', error);
       }
       
-      if (dailyLoginsResult.status === 'rejected' || (dailyLoginsResult.status === 'fulfilled' && dailyLoginsResult.value.error)) {
-        console.error('Daily data error:', dailyLoginsResult.status === 'rejected' ? dailyLoginsResult.reason : dailyLoginsResult.value.error);
-      }
-      
-      if (totalLoginsResult.status === 'rejected' || (totalLoginsResult.status === 'fulfilled' && totalLoginsResult.value.error)) {
-        console.error('Total data error:', totalLoginsResult.status === 'rejected' ? totalLoginsResult.reason : totalLoginsResult.value.error);
-      }
-
-      console.log('Weekly login count:', weeklyLoginCount);
-      console.log('Daily login count:', dailyLoginCount);
-      console.log('Total login count:', totalLoginCount);
-      
-      // Set all core values at once to prevent partial updates
+      // Update states atomically
       setWeeklyUsage(weeklyLoginCount);
       setDailyUsage(dailyLoginCount);
       setTotalUsage(totalLoginCount);
