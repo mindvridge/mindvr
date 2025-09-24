@@ -28,7 +28,6 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [isDataLoading, setIsDataLoading] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const isLoadingRef = useRef(false);
   
   const { toast } = useToast();
@@ -74,23 +73,14 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
     return `${startStr} ~ ${endStr}`;
   };
 
-  const loadDashboardData = useCallback(async (isRefresh = false) => {
+  const loadDashboardData = useCallback(async (isRefresh = false, weekToUse?: Date) => {
     // 이미 로딩 중이면 중단
     if (isLoadingRef.current && !isRefresh) {
       console.log('Already loading, skipping...');
       return;
     }
 
-    // 이전 요청 취소
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    // 새로운 AbortController 생성
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-
-    console.log('Loading dashboard data...', { isRefresh, selectedWeek });
+    console.log('Loading dashboard data...', { isRefresh, weekToUse, selectedWeek });
     isLoadingRef.current = true;
 
     try {
@@ -100,41 +90,41 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         setLoading(true);
       }
 
-      // 요청이 취소되었으면 중단
-      if (signal.aborted) return;
-
-      // Set admin session
+      // Set admin session first
       const storedUser = localStorage.getItem('current_user');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         if (userData.isAdmin || userData.id) {
+          console.log('Setting admin session:', userData.id);
           await supabase.rpc('set_admin_session', {
             admin_id_value: userData.id
           });
         }
       }
 
-      // 요청이 취소되었으면 중단
-      if (signal.aborted) return;
-
       const now = getCurrentKoreanTime();
+      const currentWeek = weekToUse || selectedWeek;
       
       // Get selected week range
-      const { weekStart, weekEnd } = getKoreanWeekRange(selectedWeek);
+      const { weekStart, weekEnd } = getKoreanWeekRange(currentWeek);
       const weekStartUTC = new Date(weekStart.getTime() - (9 * 60 * 60 * 1000));
       const weekEndUTC = new Date(weekEnd.getTime() - (9 * 60 * 60 * 1000));
       
       console.log('Week range:', weekStartUTC.toISOString(), 'to', weekEndUTC.toISOString());
 
       // Get weekly usage count
-      const { data: weeklyLogins } = await supabase
+      const { data: weeklyLogins, error: weeklyError } = await supabase
         .from('user_sessions')
         .select('id')
         .gte('login_time', weekStartUTC.toISOString())
-        .lte('login_time', weekEndUTC.toISOString())
-        .abortSignal(signal);
+        .lte('login_time', weekEndUTC.toISOString());
+
+      if (weeklyError) {
+        console.error('Weekly data error:', weeklyError);
+      }
       
       const weeklyLoginCount = weeklyLogins?.length || 0;
+      console.log('Weekly login count:', weeklyLoginCount);
       setWeeklyUsage(weeklyLoginCount);
       
       // Get daily usage count (current day or selected week's first day)
@@ -152,23 +142,31 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       const dayStartUTC = new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
       const dayEndUTC = new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
       
-      const { data: todayLogins } = await supabase
+      const { data: todayLogins, error: dailyError } = await supabase
         .from('user_sessions')
         .select('id')
         .gte('login_time', dayStartUTC.toISOString())
-        .lte('login_time', dayEndUTC.toISOString())
-        .abortSignal(signal);
+        .lte('login_time', dayEndUTC.toISOString());
+
+      if (dailyError) {
+        console.error('Daily data error:', dailyError);
+      }
       
       const dailyLoginCount = todayLogins?.length || 0;
+      console.log('Daily login count:', dailyLoginCount);
       setDailyUsage(dailyLoginCount);
 
       // Get total usage count
-      const { data: totalLogins } = await supabase
+      const { data: totalLogins, error: totalError } = await supabase
         .from('user_sessions')
-        .select('id')
-        .abortSignal(signal);
+        .select('id');
+
+      if (totalError) {
+        console.error('Total data error:', totalError);
+      }
       
       const totalLoginCount = totalLogins?.length || 0;
+      console.log('Total login count:', totalLoginCount);
       setTotalUsage(totalLoginCount);
 
       // Generate weekly chart data
@@ -192,8 +190,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           .from('user_sessions')
           .select('id')
           .gte('login_time', startUTC.toISOString())
-          .lte('login_time', endUTC.toISOString())
-          .abortSignal(signal);
+          .lte('login_time', endUTC.toISOString());
 
         return {
           date: `${date.getMonth() + 1}/${date.getDate()}`,
@@ -201,16 +198,20 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         };
       }));
       
+      console.log('Weekly chart data:', weeklyChartData);
       setWeeklyData(weeklyChartData);
 
       // Get content usage data for selected week
-      const { data: contentLogs } = await supabase
+      const { data: contentLogs, error: contentError } = await supabase
         .from('vr_usage_logs')
         .select('content_name')
         .not('content_name', 'is', null)
         .gte('start_time', weekStartUTC.toISOString())
-        .lte('start_time', weekEndUTC.toISOString())
-        .abortSignal(signal);
+        .lte('start_time', weekEndUTC.toISOString());
+
+      if (contentError) {
+        console.error('Content data error:', contentError);
+      }
 
       const contentCounts = (contentLogs || []).reduce((acc: any, log: any) => {
         const contentName = log.content_name?.toString();
@@ -229,16 +230,20 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         };
       });
       
+      console.log('Content chart data:', contentChartData);
       setContentData(contentChartData);
 
       // Get TOP3 content for selected week
-      const { data: weeklyContentLogs } = await supabase
+      const { data: weeklyContentLogs, error: topContentError } = await supabase
         .from('vr_usage_logs')
         .select('content_name, duration_minutes, start_time')
         .not('content_name', 'is', null)
         .gte('start_time', weekStartUTC.toISOString())
-        .lte('start_time', weekEndUTC.toISOString())
-        .abortSignal(signal);
+        .lte('start_time', weekEndUTC.toISOString());
+
+      if (topContentError) {
+        console.error('Top content data error:', topContentError);
+      }
 
       const weeklyContentStats = (weeklyContentLogs || []).reduce((acc: any, log: any) => {
         const contentName = log.content_name.toString();
@@ -270,6 +275,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         avgTime: formatMinutes(item.avgDuration)
       }));
       
+      console.log('Top 3 content:', top3Content);
       setTopContent(top3Content);
       
       // Update timestamp
@@ -286,14 +292,12 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         });
       }
 
+      console.log('Dashboard data loading completed successfully');
+
     } catch (error: any) {
-      // AbortError는 정상적인 취소이므로 무시
-      if (error.name === 'AbortError' || signal.aborted) {
-        return;
-      }
-      
       console.error('Dashboard data loading failed:', error);
       
+      // Reset all data on error
       setWeeklyUsage(0);
       setDailyUsage(0);
       setTotalUsage(0);
@@ -310,32 +314,24 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       isLoadingRef.current = false;
       setLoading(false);
       setRefreshing(false);
-      abortControllerRef.current = null;
     }
-  }, []);
+  }, [selectedWeek, toast]);
 
   const handleRefresh = useCallback(() => {
     console.log('Manual refresh triggered');
-    loadDashboardData(true);
-  }, [loadDashboardData]);
+    loadDashboardData(true, selectedWeek);
+  }, [loadDashboardData, selectedWeek]);
 
   useEffect(() => {
     console.log('Dashboard mounted, loading initial data');
-    loadDashboardData(false);
-    
-    // Cleanup function to abort any pending requests
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+    loadDashboardData(false, selectedWeek);
+  }, [loadDashboardData]);
 
   // selectedWeek 변경 시에만 별도로 데이터 로드
   useEffect(() => {
     console.log('Selected week changed, reloading data');
-    loadDashboardData(false);
-  }, [selectedWeek]);
+    loadDashboardData(false, selectedWeek);
+  }, [selectedWeek, loadDashboardData]);
 
   const today = new Date().toISOString().split('T')[0];
 
