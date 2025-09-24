@@ -77,6 +77,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   const loadDashboardData = useCallback(async (isRefresh = false) => {
     // 이미 로딩 중이면 중단
     if (isLoadingRef.current && !isRefresh) {
+      console.log('Already loading, skipping...');
       return;
     }
 
@@ -311,7 +312,7 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setRefreshing(false);
       abortControllerRef.current = null;
     }
-  }, [selectedWeek, toast]);
+  }, []);
 
   const handleRefresh = useCallback(() => {
     console.log('Manual refresh triggered');
@@ -319,8 +320,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
   }, [loadDashboardData]);
 
   useEffect(() => {
-    console.log('Dashboard data load triggered', { selectedWeek });
-    loadDashboardData();
+    console.log('Dashboard mounted, loading initial data');
+    loadDashboardData(false);
     
     // Cleanup function to abort any pending requests
     return () => {
@@ -328,7 +329,13 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
         abortControllerRef.current.abort();
       }
     };
-  }, [loadDashboardData]);
+  }, []);
+
+  // selectedWeek 변경 시에만 별도로 데이터 로드
+  useEffect(() => {
+    console.log('Selected week changed, reloading data');
+    loadDashboardData(false);
+  }, [selectedWeek]);
 
   const today = new Date().toISOString().split('T')[0];
 
