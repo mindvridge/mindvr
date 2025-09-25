@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Trophy, Clock, Users, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentKoreanTime, formatToKoreanTime } from '@/lib/dateUtils';
+import { getCurrentKoreanTime, formatToKoreanTime, getKoreanTodayStartUTC, getKoreanTodayEndUTC } from '@/lib/dateUtils';
 
 interface DashboardOverviewProps {
   getContentUsageStats: () => Promise<any[]>;
@@ -120,20 +120,12 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       console.log('Week range:', weekStartUTC.toISOString(), 'to', weekEndUTC.toISOString());
 
-      // Calculate daily dates for parallel requests
-      const today = new Date(now);
-      let targetDate = today;
-      if (today < weekStart || today > weekEnd) {
-        targetDate = weekStart;
-      }
+      // Calculate daily dates for parallel requests - 현재 한국 날짜 기준
+      const dayStartUTC = getKoreanTodayStartUTC();
+      const dayEndUTC = getKoreanTodayEndUTC();
       
-      const dayStart = new Date(targetDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(targetDate);
-      dayEnd.setHours(23, 59, 59, 999);
-      
-      const dayStartUTC = new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
-      const dayEndUTC = new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
+      console.log('Daily range (Korean today):', dayStartUTC.toISOString(), 'to', dayEndUTC.toISOString());
+      console.log('Current Korean time:', now.toISOString());
 
       // Execute all basic queries in parallel with proper error handling
       console.log('Fetching basic stats...');

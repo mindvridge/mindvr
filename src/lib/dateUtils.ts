@@ -22,7 +22,35 @@ export const formatToKoreanTime = (date: string | Date, formatString: string = '
  * 현재 한국 시간을 반환합니다
  */
 export const getCurrentKoreanTime = (): Date => {
-  return toZonedTime(new Date(), KOREA_TIMEZONE);
+  const now = new Date();
+  // 한국 시간대의 현재 시간을 정확히 계산
+  const koreanOffset = 9 * 60; // 한국은 UTC+9
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc + (koreanOffset * 60000));
+};
+
+/**
+ * 현재 한국 날짜의 시작 시간 (00:00:00)을 UTC로 반환합니다
+ */
+export const getKoreanTodayStartUTC = (): Date => {
+  const koreanNow = getCurrentKoreanTime();
+  const dayStart = new Date(koreanNow);
+  dayStart.setHours(0, 0, 0, 0);
+  
+  // 한국 시간 00:00:00을 UTC로 변환 (9시간 빼기)
+  return new Date(dayStart.getTime() - (9 * 60 * 60 * 1000));
+};
+
+/**
+ * 현재 한국 날짜의 끝 시간 (23:59:59)을 UTC로 반환합니다
+ */
+export const getKoreanTodayEndUTC = (): Date => {
+  const koreanNow = getCurrentKoreanTime();
+  const dayEnd = new Date(koreanNow);
+  dayEnd.setHours(23, 59, 59, 999);
+  
+  // 한국 시간 23:59:59를 UTC로 변환 (9시간 빼기)
+  return new Date(dayEnd.getTime() - (9 * 60 * 60 * 1000));
 };
 
 /**
