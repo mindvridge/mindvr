@@ -250,7 +250,7 @@ async function handleAutoLogin(supabase: any, body: ApiRequest) {
 
   try {
     // 1. 먼저 계정이 존재하는지 확인
-    const { data: userData, error: userError } = await supabase
+    let { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('username', body.username)
@@ -528,11 +528,11 @@ async function handleDataQuery(supabase: any, req: Request) {
   try {
     switch (type) {
       case 'vr_logs':
-        return await queryVRLogs(supabase, { username, device_id, limit })
+        return await queryVRLogs(supabase, { username: username || undefined, device_id: device_id || undefined, limit })
       case 'content_logs':
-        return await queryContentLogs(supabase, { username, limit })
+        return await queryContentLogs(supabase, { username: username || undefined, limit })
       case 'user_sessions':
-        return await queryUserSessions(supabase, { username, limit })
+        return await queryUserSessions(supabase, { username: username || undefined, limit })
       case 'content_data':
         return await queryContentData(supabase, { limit })
       default:
