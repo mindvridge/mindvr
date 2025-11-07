@@ -5,6 +5,9 @@ import { ko } from 'date-fns/locale';
 // 한국 시간대
 export const KOREA_TIMEZONE = 'Asia/Seoul';
 
+// Re-export fromZonedTime for use in other components
+export { fromZonedTime };
+
 /**
  * 한국 시간으로 날짜를 포맷팅합니다
  */

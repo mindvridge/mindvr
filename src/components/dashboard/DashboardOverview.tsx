@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Trophy, Clock, Users, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getCurrentKoreanTime, formatToKoreanTime, getKoreanTodayStartUTC, getKoreanTodayEndUTC } from '@/lib/dateUtils';
+import { getCurrentKoreanTime, formatToKoreanTime, getKoreanTodayStartUTC, getKoreanTodayEndUTC, fromZonedTime } from '@/lib/dateUtils';
+import { KOREA_TIMEZONE } from '@/lib/dateUtils';
 
 interface DashboardOverviewProps {
   getContentUsageStats: () => Promise<any[]>;
@@ -101,8 +102,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
               admin_id_value: userData.id
             });
             console.log('Admin session set successfully');
-            // Wait a moment to ensure session is properly set
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Wait to ensure session is properly set in database
+            await new Promise(resolve => setTimeout(resolve, 200));
           } catch (error) {
             console.error('Failed to set admin session:', error);
             throw error; // Abort if admin session cannot be set
@@ -115,8 +116,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       
       // Get selected week range
       const { weekStart, weekEnd } = getKoreanWeekRange(currentWeek);
-      const weekStartUTC = new Date(weekStart.getTime() - (9 * 60 * 60 * 1000));
-      const weekEndUTC = new Date(weekEnd.getTime() - (9 * 60 * 60 * 1000));
+      const weekStartUTC = fromZonedTime(weekStart, KOREA_TIMEZONE);
+      const weekEndUTC = fromZonedTime(weekEnd, KOREA_TIMEZONE);
       
       console.log('Week range:', weekStartUTC.toISOString(), 'to', weekEndUTC.toISOString());
 
@@ -192,8 +193,8 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
           const endOfDay = new Date(date);
           endOfDay.setHours(23, 59, 59, 999);
 
-          const startUTC = new Date(startOfDay.getTime() - (9 * 60 * 60 * 1000));
-          const endUTC = new Date(endOfDay.getTime() - (9 * 60 * 60 * 1000));
+          const startUTC = fromZonedTime(startOfDay, KOREA_TIMEZONE);
+          const endUTC = fromZonedTime(endOfDay, KOREA_TIMEZONE);
 
           return supabase
             .from('user_sessions')
@@ -348,23 +349,18 @@ export const DashboardOverview = ({ getContentUsageStats, getUserStats, getLogin
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedWeek, toast]);
+  }, [toast]); // selectedWeek 제거하여 함수 재생성 방지
 
   const handleRefresh = useCallback(() => {
     console.log('Manual refresh triggered');
     loadDashboardData(true, selectedWeek);
   }, [loadDashboardData, selectedWeek]);
 
+  // selectedWeek 변경 시에만 데이터 로드 (마운트 포함)
   useEffect(() => {
-    console.log('Dashboard mounted, loading initial data');
+    console.log('Dashboard mounted or week changed, loading data');
     loadDashboardData(false, selectedWeek);
-  }, [loadDashboardData]);
-
-  // selectedWeek 변경 시에만 별도로 데이터 로드
-  useEffect(() => {
-    console.log('Selected week changed, reloading data');
-    loadDashboardData(false, selectedWeek);
-  }, [selectedWeek, loadDashboardData]);
+  }, [selectedWeek]); // loadDashboardData 제거하여 중복 호출 방지
 
   const today = new Date().toISOString().split('T')[0];
 
