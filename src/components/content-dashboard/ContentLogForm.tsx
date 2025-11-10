@@ -21,10 +21,20 @@ export const ContentLogForm = ({ onSubmit, loading }: ContentLogFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 한국시간 타임존 정보 추가
+    const addTimezone = (timeStr: string) => {
+      if (!timeStr) return undefined;
+      if (timeStr.includes('+') || timeStr.includes('Z')) return timeStr;
+      return timeStr + '+09:00';
+    };
+
     const submitData = {
       ...formData,
-      end_time: formData.end_time || undefined,
+      start_time: addTimezone(formData.start_time),
+      end_time: addTimezone(formData.end_time),
     };
+    
     onSubmit(submitData);
     setFormData({
       user_id: '',

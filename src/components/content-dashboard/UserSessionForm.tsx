@@ -39,10 +39,17 @@ export const UserSessionForm = ({ loading }: UserSessionFormProps) => {
 
     setIsSubmitting(true);
     try {
+      // 한국시간 타임존 정보 추가
+      const addTimezone = (timeStr: string) => {
+        if (!timeStr) return null;
+        if (timeStr.includes('+') || timeStr.includes('Z')) return timeStr;
+        return timeStr + '+09:00';
+      };
+
       const sessionData = {
         user_id: formData.user_id,
-        login_time: formData.login_time,
-        logout_time: formData.logout_time || null,
+        login_time: addTimezone(formData.login_time),
+        logout_time: formData.logout_time ? addTimezone(formData.logout_time) : null,
       };
 
       const { error } = await supabase

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { VRUsageLog, VRLogFormData, ContentUsageStats, DeviceUsageStats } from '@/types/vr-log';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { fromZonedTime, KOREA_TIMEZONE } from '@/lib/dateUtils';
 
 export const useVRLogs = () => {
   const [logs, setLogs] = useState<VRUsageLog[]>([]);
@@ -27,12 +28,18 @@ export const useVRLogs = () => {
       if (monthFilter) {
         const year = monthFilter.split('-')[0];
         const month = monthFilter.split('-')[1];
-        const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+        
+        // 한국 시간대 기준으로 월의 시작과 끝 날짜 생성
+        const koreanStartDate = new Date(parseInt(year), parseInt(month) - 1, 1, 0, 0, 0, 0);
+        const koreanEndDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+        
+        // 한국 시간을 UTC로 변환하여 DB 쿼리에 사용
+        const startDateUTC = fromZonedTime(koreanStartDate, KOREA_TIMEZONE);
+        const endDateUTC = fromZonedTime(koreanEndDate, KOREA_TIMEZONE);
         
         query = query
-          .gte('start_time', startDate.toISOString())
-          .lte('start_time', endDate.toISOString());
+          .gte('start_time', startDateUTC.toISOString())
+          .lte('start_time', endDateUTC.toISOString());
       }
 
       const { data, error } = await query;

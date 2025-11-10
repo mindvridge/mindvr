@@ -4,6 +4,7 @@ import { VRUsageLog, ContentUsageStats, DeviceUsageStats } from '@/types/vr-log'
 import { UserStats } from '@/types/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { getCurrentKoreanTime, getKoreanTodayStartUTC, getKoreanTodayEndUTC, fromZonedTime, KOREA_TIMEZONE } from '@/lib/dateUtils';
 
 export const useContentLogs = () => {
   const [logs, setLogs] = useState<VRUsageLog[]>([]);
@@ -52,18 +53,17 @@ export const useContentLogs = () => {
         const year = monthFilter.split('-')[0];
         const month = monthFilter.split('-')[1];
         
-        // Create Korean timezone dates
-        const koreaOffset = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
-        const utcStartDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-        const utcEndDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+        // 한국 시간대 기준으로 월의 시작과 끝 날짜 생성
+        const koreanStartDate = new Date(parseInt(year), parseInt(month) - 1, 1, 0, 0, 0, 0);
+        const koreanEndDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
         
-        // Convert to Korean timezone for database query
-        const startDate = new Date(utcStartDate.getTime() + koreaOffset);
-        const endDate = new Date(utcEndDate.getTime() + koreaOffset);
+        // 한국 시간을 UTC로 변환하여 DB 쿼리에 사용
+        const startDateUTC = fromZonedTime(koreanStartDate, KOREA_TIMEZONE);
+        const endDateUTC = fromZonedTime(koreanEndDate, KOREA_TIMEZONE);
         
         query = query
-          .gte('start_time', startDate.toISOString())
-          .lte('start_time', endDate.toISOString());
+          .gte('start_time', startDateUTC.toISOString())
+          .lte('start_time', endDateUTC.toISOString());
       }
 
       const { data, error } = await query;
@@ -125,18 +125,18 @@ export const useContentLogs = () => {
 
   const updateLogEndTime = async (logId: string) => {
     try {
-      // Calculate duration from start_time to now
+      // Calculate duration from start_time to now (Korean time)
       const log = logs.find(l => l.id === logId);
       if (!log) return;
       
-      const now = new Date();
+      const koreanNow = getCurrentKoreanTime();
       const startTime = new Date(log.start_time);
-      const durationMinutes = Math.round((now.getTime() - startTime.getTime()) / (1000 * 60));
+      const durationMinutes = Math.round((koreanNow.getTime() - startTime.getTime()) / (1000 * 60));
       
       const { error } = await supabase
         .from('vr_usage_logs')
         .update({ 
-          end_time: now.toISOString(),
+          end_time: koreanNow.toISOString(),
           duration_minutes: durationMinutes
         })
         .eq('id', logId);
