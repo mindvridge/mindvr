@@ -30,6 +30,26 @@ const corsHeaders = {
 }
 
 // =====================================
+// 한국 시간 헬퍼 함수
+// =====================================
+function getKoreanTimeISO(): string {
+  const now = new Date();
+  // UTC 시간에 9시간(한국 시간대) 추가
+  const koreanTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  return koreanTime.toISOString();
+}
+
+// 클라이언트에서 받은 시간 문자열에 한국 타임존 정보 추가
+function addKoreanTimezone(timeString: string): string {
+  // 이미 타임존 정보가 있으면 그대로 반환
+  if (timeString.includes('+') || timeString.includes('Z')) {
+    return timeString;
+  }
+  // 타임존 정보가 없으면 +09:00 추가
+  return timeString + '+09:00';
+}
+
+// =====================================
 // 메인 핸들러
 // =====================================
 Deno.serve(async (req) => {
@@ -149,7 +169,7 @@ async function handleUserLogin(supabase: any, body: ApiRequest) {
       .from('user_sessions')
       .insert([{
         user_id: userData.id,
-        login_time: new Date().toISOString()
+        login_time: getKoreanTimeISO()
       }])
       .select()
       .single()
@@ -185,7 +205,7 @@ async function handleUserLogout(supabase: any, body: ApiRequest) {
   try {
     const { error } = await supabase
       .from('user_sessions')
-      .update({ logout_time: new Date().toISOString() })
+      .update({ logout_time: getKoreanTimeISO() })
       .eq('id', body.session_id)
 
     if (error) {
@@ -312,7 +332,7 @@ async function handleAutoLogin(supabase: any, body: ApiRequest) {
         .from('user_sessions')
         .insert([{
           user_id: userData.id,
-          login_time: new Date().toISOString()
+          login_time: getKoreanTimeISO()
         }])
         .select()
         .single()
@@ -360,12 +380,12 @@ async function handleVRLog(supabase: any, body: ApiRequest) {
     const logData: any = {
       device_id: body.device_id,
       content_name: body.content_name,
-      start_time: body.start_time
+      start_time: addKoreanTimezone(body.start_time)
     }
 
     // 종료 시간 설정 (duration_minutes는 generated column이므로 자동 계산됨)
     if (body.end_time) {
-      logData.end_time = body.end_time
+      logData.end_time = addKoreanTimezone(body.end_time)
     }
 
     // 사용자명이 제공된 경우 사용자 ID 조회 또는 생성
@@ -484,12 +504,12 @@ async function handleContentLog(supabase: any, body: ApiRequest) {
       user_id: userData.id,
       device_id: 'CONTENT_DEVICE',
       content_name: body.content_name,
-      start_time: body.start_time
+      start_time: addKoreanTimezone(body.start_time)
     }
 
     // 종료 시간 설정 (duration_minutes는 generated column이므로 자동 계산됨)
     if (body.end_time) {
-      logData.end_time = body.end_time
+      logData.end_time = addKoreanTimezone(body.end_time)
     }
 
     console.log('콘텐츠 로그 저장 시작:', JSON.stringify(logData, null, 2))

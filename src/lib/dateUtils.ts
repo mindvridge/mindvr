@@ -53,11 +53,21 @@ export const getKoreanTodayEndUTC = (): Date => {
 };
 
 /**
- * 한국 시간으로 ISO 문자열을 생성합니다
+ * 한국 시간으로 ISO 문자열을 생성합니다 (타임존 정보 포함)
  */
 export const getCurrentKoreanTimeISO = (): string => {
   const koreanTime = getCurrentKoreanTime();
+  // datetime-local input 형식에 맞게 타임존 없이 반환
   return formatInTimeZone(koreanTime, KOREA_TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss");
+};
+
+/**
+ * 한국 시간으로 ISO 문자열을 생성합니다 (타임존 정보 포함, DB 저장용)
+ */
+export const getCurrentKoreanTimeISOWithZone = (): string => {
+  const koreanTime = getCurrentKoreanTime();
+  // 타임존 정보 포함 (+09:00)
+  return formatInTimeZone(koreanTime, KOREA_TIMEZONE, "yyyy-MM-dd'T'HH:mm:ssXXX");
 };
 
 /**
